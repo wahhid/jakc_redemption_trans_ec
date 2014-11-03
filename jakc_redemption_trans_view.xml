@@ -8,29 +8,46 @@
             <field name="arch" type="xml">
                 <form string="Transaction" version="7.0">  
                     <header>
-                        <button name="trans_close" string="Close" type="object" states="open" confirm="Are you sure to close this transaction?"/>                                                
-                        <button name="print_receipt" String="Print" type="object" class="oe_highlight" states="done"/>
+                        <button name="trans_close" string="Close" type="object" class="oe_highlight" states="open" confirm="Are you sure to close this transaction?"/>                                                
+                        <button name="print_receipt" String="Print" type="object" class="oe_highlight" attrs="{'invisible':[('printed','=',True)]}" states="done"/>
                         <button name="re_print" String="Re-Print" type="object" class="oe_highlight" states="done"/>
                         <button name="trans_reset" String="Re-Open" type="object" class="oe_highlight" states="done"/>                      
                    </header> 
-					<sheet>
-						<group>                            
-	                    	<field name="trans_id"/>
-	                        <field name="customer_id" domain="[('contact_type','=','customer')]"/>
-	                        <field name="type"/>
-	                        <field name="schemas_id"/> 						                      
+					<sheet>											
+						<group colspan="4">
+							<h1>
+								<field name="schemas_id"/>		
+							</h1>															
+						</group>						
+						<group colspan="4" string="Customer">
+							<h1>							
+								<field name="customer_id" domain="[('contact_type','=','customer')]"/>
+							</h1>	
+						</group>						
+												
+						<group colspan="4" string="General information">
+							<field name="trans_id"/>                            	                    		                       
+	                        <field name="type"/>	                         						                     
 	                        <field name="trans_date"/>
-	                        <field name="total_amount"/>
-	                        <field name="valid_amount"/>
-	                        <field name="total_item"/>       
-	                        <field name="total_coupon" attrs="{'invisible':[('type','=','point')]}"/>       
-	                        <field name="total_point"/>       
-	                        <field name="coupon" attrs="{'invisible':[('type','=','point')]}"/>       
-	                        <field name="point"/>
-	                        <field name="add_coupon" attrs="{'invisible':[('type','=','point')]}"/>                                   
-	                        <field name="add_point"/>       
+	                       	<field name="trans_filter"/>	     
 	                        <field name="state"/>       
+							<field name="printed"/>                            	
 	                    </group>            
+						<group colspan="2">
+							<group string="Amount and Item">
+		                        <field name="total_amount"/>
+		                        <field name="valid_amount"/>
+		                        <field name="total_item"/>       																
+							</group>
+							<group string="Coupon and Point">
+		                        <field name="total_coupon" attrs="{'invisible':[('type','=','point')]}"/>       
+		                        <field name="total_point"/>       
+		                        <field name="coupon" attrs="{'invisible':[('type','=','point')]}"/>       
+		                        <field name="point"/>
+		                        <field name="add_coupon" attrs="{'invisible':[('type','=','point')]}"/>                                   
+		                        <field name="add_point"/> 															
+							</group>														
+						</group>	                    
 						<notebook colspan="4">
 	                        <page string="Details">
 	                            <field name="trans_detail_ids" widget="one2many_list" nolabel="1">
@@ -42,27 +59,23 @@
 	                                    <field name="payment_type"/>
 	                                    <field name="bank_id"/>                                    
 	                                    <field name="card_number"/>
-	                                    <field name="tenant_filter"/>
+	                                    <field name="tenant_filter" attrs="{'invisible': True}"/>
 	                                </tree>
 	                            </field>
 	                        </page>              
 							<page string="Remarks">  
 	                       		<field name="remark"/>                         
-	                        </page>     
-							<page string="Transaction Status">
-								<label for="trans_filter" string="Trans Filter"/>
-								<field name="trans_filter"/>																				
-							</page>                        
-							<page string="Coupons">
+	                        </page>                          
+							<page string="Transaction Coupons">
 	                        	<field name="customer_coupon_ids" widget="one2many_list" nolabel="1">
 	                            	<tree string="Coupons">                                                                                                	
-	                                	<field name="trans_type"/>
-	                                	<field name="coupon_id"/>
+	                                	<field name="trans_type"/>	
+	                                	<field name="coupon"/>	                                	
 	                                	<field name="expired_date"/>                                                                                                                                                                                                                                      
 	                            	</tree>                    
 	                        	</field>
 	                    	</page>
-	                    	<page string="Points">
+	                    	<page string="Transaction Points">
 	                        	<field name="customer_point_ids" widget="one2many_list" nolabel="1">
 	                            	<tree string="Points">                                                                                                	
 	                                	<field name="trans_type"/>
@@ -71,8 +84,7 @@
 	                            	</tree>                    
 	                        	</field>
 	                    	</page>				                                                								                    
-	                    </notebook>                                              
-												
+	                    </notebook>                                              												
 					</sheet>                   
                 </form>
             </field>
@@ -158,18 +170,34 @@
 
         <!-- RDM/SEQUENCE -->
         <!-- TRANSACTION ID -->       
+	    <!-- REDEMPTION ID -->    	
         <record id="sequence_type_rdm_trans_coupon" model="ir.sequence.type">
-            <field name="name">Transaction Coupon</field>
-            <field name="code">rdm.trans.coupon.sequence</field>
+            <field name="name">Transaction Remption</field>
+            <field name="code">rdm.trans.redemption.sequence</field>
         </record>
         
         <record id="sequence_rdm_trans_coupon" model="ir.sequence">
-            <field name="name">Transaction Coupon</field>
-            <field name="code">rdm.trans.coupon.sequence</field>
+            <field name="name">Transaction Redemption</field>
+            <field name="code">rdm.trans.redemption.sequence</field>
+			<field name="prefix">RDM</field>            
             <field name="padding" eval="10"/>
             <field name="number_increment">1</field>            
         </record>
         
+		<!-- POINT ID -->	
+        <record id="sequence_type_rdm_trans_point" model="ir.sequence.type">
+            <field name="name">Transaction Point</field>
+            <field name="code">rdm.trans.point.sequence</field>
+        </record>
+        
+        <record id="sequence_rdm_trans_point" model="ir.sequence">
+            <field name="name">Transaction Point</field>
+            <field name="code">rdm.trans.point.sequence</field>
+			<field name="prefix">POI</field>            
+            <field name="padding" eval="10"/>
+            <field name="number_increment">1</field>            
+        </record>
+                        
         <!-- RDM/ACTION -->
         <!-- PROMO -->
 		<record model="ir.actions.act_window" id="action_rdm_promo_trans">

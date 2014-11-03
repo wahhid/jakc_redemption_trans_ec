@@ -8,18 +8,8 @@
             <field name="inherit_id" ref="jakc_redemption_customer.view_rdm_customer_form"/>					
             <field name="arch" type="xml">
                 <notebook position="inside">
-                    <page string="Promo">
-                        <field name="promo_trans_ids" widget="one2many_list" nolabel="1">
-                            <tree>                   
-                            	<field name="schemas_id"/>                                            
-                                <field name="trans_date"/>                                
-                                <field name="total_amount"/>                                                                        
-                                <field name="total_item"/>                                                                        
-                            </tree>                    
-                        </field>
-                    </page>
-                    <page string="Point">
-                        <field name="point_trans_ids" widget="one2many_list" nolabel="1">
+                    <page string="Transaction">
+                        <field name="trans_ids" widget="one2many_list" nolabel="1">
                             <tree>                   
                             	<field name="schemas_id"/>                                            
                                 <field name="trans_date"/>                                

@@ -51,10 +51,20 @@ class rdm_trans(osv.osv):
         self._calculate_add_coupon_and_point(cr, uid, ids[0], context)
         self._calculate_total_coupon_and_point(cr, uid, ids[0], context)
         self._generate_coupon(cr, uid, ids[0], context)     
+        self._generate_point(cr, uid, ids[0], context)
         return True
     
+    def _update_print_status(self, cr, uid, ids, context=None):
+        _logger.info("Update Print Status for ID : " + str(ids))
+        values = {}
+        values.update({'bypass':True})
+        values.update({'method':'_update_print_status'})
+        values.update({'printed':True})
+        self.write(cr, uid, ids, values, context=context)
+                
     def print_receipt(self, cr, uid, ids, context=None):
-        _logger.info("Print Receipt for ID : " + str(ids))        
+        _logger.info("Print Receipt for ID : " + str(ids))
+        self._update_print_status(cr, uid, ids, context)        
         id = ids[0]   
         serverUrl = 'http://' + reportserver + ':' + reportserverport +'/jasperserver'
         j_username = 'rdm_operator'
@@ -103,7 +113,7 @@ class rdm_trans(osv.osv):
         return schemas_id       
                     
     def _get_trans(self, cr, uid, trans_id , context=None):
-        return self.pool.get('rdm.trans').browse(cr, uid, trans_id, context=context);
+        return self.browse(cr, uid, trans_id, context=context);
             
     def _get_trans_detail(self, cr, uid, trans_id, context=None):
         return self.pool.get('rdm.trans.detail').browse(cr, uid, trans_id, context=context)
@@ -130,80 +140,78 @@ class rdm_trans(osv.osv):
         message = ""
        
         trans = self._get_trans(cr, uid, trans_id, context)
-        schemas_id = trans['schemas_id']
-        customer_id = trans['customer_id']            
-        schemas = self.pool.get('rdm.schemas').browse(cr, uid, schemas_id, context=context)
-        customer = self.pool.get('rdm.customer').browse(cr, uid, customer_id, context=context)
+        schemas = trans.schemas_id
+        customer = trans.customer_id
         
         #Filter Segment        
-        _logger.info("Start Segment Filter")
-        
+        _logger.info("Start Segment Filter")        
         if schemas.segment_ids:            
-            for segment in schemas.segment_ids:
+            for schemas_segment_id in schemas.segment_ids:                
                 customer_age = datetime.date.today() - customer.birth_date
-                if customer_age >= customer.start_age and customer_age <= customer.end_age:
+                if customer_age >= schemas_segment_id.start_age and customer_age <= schemas_segment_id.end_age:
                     segment_message = "Segment Allowed"
                     segment_status = True                    
         else:            
             segment_message = "Segment Allowed"
             segment_status = True         
         _logger.info("End Segment Filter")
+        
         #Filter Gender    
-        _logger.info("Start Gender Filter")
+        _logger.info("Start Gender Filter")                    
+        if schemas.gender_ids:
+            for schemas_gender_id in schemas.gender_ids:
+                if schemas_gender_id.gender_id.id == customer.gender.id:
+                    gender_message = "Gender Allowed"
+                    gender_status = True        
+        else:
+            gender_message = "Gender Allowed"
+            gender_status = True        
+        _logger.info("End Gender Filter")
         
-        
-        gender_status = True
-        gender_message = "Gender Allowed"
-        
-        #if promo.gender_ids:            
-        #    for gender in promo.gender_ids:                
-        #        if gender.id == customer.gender.id:
-        #            gender_message = "Gender Allowed"                                                
-        #            gender_status = True
-        #else:            
-        #    message = message + "\n" + "Gender Allowed"                                                
-        #    gender_status = True
-        #_logger.info("End Gender Filter")
-        
+        #Filter Religion 
         if schemas.religion_ids:
-            for religion in schemas.religion_ids:
-                if religion.id == customer.religion.id:
+            for schemas_religion_id in schemas.religion_ids:
+                if schemas_religion_id.religion_id.id == customer.religion.id:
                     religion_message = "Religion Allowed"                                                
                     religion_status = True                
         else:
             religion_message = "Religion Allowed"                                                
             religion_status = True
-            
+        
+        #Filter Ethnic     
         if schemas.ethnic_ids:
-            for ethnic in schemas.ethnic_ids:
-                if ethnic.id == customer.ethnic.id:
+            for schemas_ethnic_id in schemas.ethnic_ids:
+                if schemas_ethnic_id.ethnic_id.id == customer.ethnic.id:
                     ethnic_message = "Ethnic Allowed"                                                
                     ethnic_status = True
         else:
             ethnic_message = "Ethnic Allowed"                                                
             ethnic_status = True
         
+        #Filter Marital
         if schemas.marital_ids:
-            for marital in schemas.marital_ids:
-                if marital.id == customer.marital.id:
+            for schemas_marital_id in schemas.marital_ids:
+                if schemas_marital_id.marital_id.id == customer.marital.id:
                     marital_message = "Marital Allowed"                                                
                     marital_status = True
         else:
             marital_message = "Marital Allowed"                                                
             marital_status = True
             
+        #Filter Interest  
         if schemas.interest_ids:
-            for interest in schemas.interest_ids:
-                if interest.id == customer.interest.id:
+            for schemas_interest_id in schemas.interest_ids:
+                if schemas_interest_id.interest_id.id == customer.interest.id:
                     interest_message = "Interest Allowed"                                                
                     interest_status = True                    
         else: 
             interest_message = "Interest Allowed"                                                
             interest_status = True                
-            
+        
+        #Filter AYC Card Type
         if schemas.card_type_ids:
-            for card_type in schemas.card_type_ids:
-                if card_type.id == customer.card_type.id:
+            for schemas_card_type_id in schemas.card_type_ids:
+                if schemas_card_type_id.card_type_id.id == customer.card_type.id:
                     cardtype_message = "Card Type Allowed"                                                
                     cardtype_status = True                
         else:
@@ -214,7 +222,7 @@ class rdm_trans(osv.osv):
         message = segment_message + "\n" + gender_message + "\n" + religion_message + "\n" + ethnic_message + "\n" + marital_message + "\n" + interest_message + "\n" + cardtype_message
         datas = {}
         if status == True:
-            datas.update({'promo_filter':True})                                    
+            datas.update({'trans_filter':True})                                    
         datas.update({'remark': message})
         super(rdm_trans,self).write(cr, uid, [trans_id], datas, context=context)            
         return None    
@@ -222,23 +230,34 @@ class rdm_trans(osv.osv):
     def _get_tenant_filters(self, cr, uid, schemas_id, tenant_id, context=None):
         _logger.info('Start Tenant Filter')
         status = False
-        message = "Error tenant " + str(tenant_id) + " filter"
-        schemas_tenant = self.pool.get('rdm.tenant').browse(cr, uid, tenant_id,context=context)
+        message = "Error tenant " + str(tenant_id.id) + " filter"
         
-        promo_tenant_ids = self.pool.get('rdm.schemas.tenant').search(cr, uid, [('schemas_id','=',schemas_id),('tenant_id','=',tenant_id)], context=context)
-        if promo_tenant_ids:
-            status = True
-        
-        promo_tenant_category = self.pool.get('rdm.schemas.tenant.category').browse(cr, uid, [('schemas_id','=',schemas_id),('tenant_category_id','',schemas_tenant.category.id)])
-        if promo_tenant_category:
+        schemas_tenant_ids = schemas_id.tenant_ids
+        if schemas_tenant_ids:
+            for schemas_tenant_id in schemas_tenant_ids:
+                if schemas_tenant_id.tenant_id.id == tenant_id.id:
+                    status = True
+        else:
             status = True
             
+        schemas_tenant_category_ids = schemas_id.tenant_category_ids
+        if schemas_tenant_category_ids:
+            for schemas_tenant_category_id in schemas_tenant_category_ids:
+                if schemas_tenant_category_id.tenant_category_id.id == tenant_id.category.id:
+                    status = True
+        else:
+            status = True                
+                                                
         _logger.info('End Tenant Filter')                            
         return status, message    
     
     def _set_trans_id(self, cr, uid, trans_id, context=None):
         _logger.info('Start Set Trans ID Filter')
-        trans_seq_id = self.pool.get('ir.sequence').get(cr, uid, 'rdm.trans.coupon.sequence'),
+        trans = self._get_trans(cr, uid, trans_id, context)
+        if trans.type == 'promo':
+            trans_seq_id = self.pool.get('ir.sequence').get(cr, uid, 'rdm.trans.redemption.sequence'),
+        if trans.type == 'point':
+            trans_seq_id = self.pool.get('ir.sequence').get(cr, uid, 'rdm.trans.point.sequence'),            
         trans_data = {}
         trans_data.update({'trans_id':trans_seq_id[0]})        
         super(rdm_trans,self).write(cr, uid, [trans_id], trans_data, context=context)
@@ -263,32 +282,38 @@ class rdm_trans(osv.osv):
     def _get_valid_total(self, cr, uid, trans_id, context=None):
         _logger.info('Start Get Valid Total Filter')        
         trans = self._get_trans(cr, uid, trans_id, context)
-        schemas_id = trans.schemas_id.id
-        valid_amount = 0            
-        
+        schemas_id = trans.schemas_id
+        valid_amount = 0                    
         for trans_detail in trans.trans_detail_ids:
-            tenant_id = trans_detail.tenant_id.id
+            tenant_id = trans_detail.tenant_id
             status, message = self._get_tenant_filters(cr, uid, schemas_id, tenant_id, context=context)
             if status:        
                 valid_amount = valid_amount + trans_detail.total_amount
             else:
                 detail_data = {}
                 detail_data.update({'tenant_filter':True})
-                self.pool.get('rdm.promo.trans.detail').write(cr, uid, [trans_detail.id], detail_data, context=context)             
+                self.pool.get('rdm.trans.detail').write(cr, uid, [trans_detail.id], detail_data, context=context)             
             
         trans_data = {}
-        trans_data.update({'valid_amount':valid_amount})        
+        if trans.trans_filter == True:
+            trans_data.update({'valid_amount':valid_amount})
+        else:
+            trans_data.update({'valid_amount':0})        
         super(rdm_trans,self).write(cr, uid, [trans_id], trans_data, context=context)
         _logger.info('End Get Total Filter')
         
     
     def _calculate_coupon_and_point(self,cr, uid, trans_id, context=None):
         _logger.info('Start Calculate Coupon and Point')
+        coupon = 0
+        point = 0       
         trans = self._get_trans(cr, uid, trans_id, context)
         schemas_id = trans.schemas_id
         valid_amount = trans.valid_amount
-        coupon = (valid_amount // schemas_id.spend_amount) * schemas_id.coupon
-        
+             
+        if trans.type == 'promo':                        
+            coupon = (valid_amount // schemas_id.spend_amount) * schemas_id.coupon
+            
         if schemas_id.limit_point == -1:
             point = (valid_amount // schemas_id.spend_amount) * schemas_id.point
         else:
@@ -396,14 +421,14 @@ class rdm_trans(osv.osv):
                 for trans_detail in trans_detail_ids:
                     #Get Tenant Type Information
                     tenant_id = trans_detail.tenant_id                                    
-                    tenant_type_id = tenant_id.type.id
-                    _logger.info('Tenant Type ID : ' + str(tenant_type_id))
+                    tenant_category_id = tenant_id.category.id
+                    _logger.info('Tenant Type ID : ' + str(tenant_category_id))
                     #Get Tenant Type IDS from Schemas
-                    rules_tenant_type_ids = rules.tenant_type_ids                                                    
-                    _logger.info('Length Schemas Tenant Type : ' + str(len(rules_tenant_type_ids)))
-                    for rules_tenant_type in rules_tenant_type_ids:                        
-                        _logger.info('Schemas Tenant Type ID : ' + str(rules_tenant_type.tenant_type_id.id))
-                        if rules_tenant_type.tenant_type_id.id == tenant_type_id:
+                    rules_tenant_category_ids = rules.tenant_category_ids                                                    
+                    _logger.info('Length Schemas Tenant Type : ' + str(len(rules_tenant_category_ids)))
+                    for rules_tenant_category in rules_tenant_category_ids:                        
+                        _logger.info('Schemas Tenant Type ID : ' + str(rules_tenant_category.tenant_category_id.id))
+                        if rules_tenant_category.tenant_category_id.id == tenant_category_id:
                             total_amount = total_amount + trans_detail.total_amount
                             
                 _logger.info('Total Amount : ' + str(total_amount))
@@ -423,10 +448,8 @@ class rdm_trans(osv.osv):
                         if rules.operation == 'add':
                             point = point + rules.quantity
                         if rules.operation == 'multiple':
-                            point = point + rules.quantity                                                                                    
-                    
-                    coupon = coupon + add_coupon
-                    _logger.info('Coupon : ' + str(coupon))
+                            point = point + rules.quantity
+                                                                                                                                                                        
                 _logger.info('End Tenant Type Schemas')
                 
             #Bank Card
@@ -476,8 +499,7 @@ class rdm_trans(osv.osv):
         
         super(rdm_trans,self).write(cr, uid, [trans_id], trans_data, context=context)        
         _logger.info('End Calculate Add Coupon and Point')
-        
-            
+                    
     def _calculate_total_coupon_and_point(self, cr, uid, trans_id, context=None):
         _logger.info('Start Calculate Total Coupon and Point')
         trans = self._get_trans(cr, uid, trans_id, context)
@@ -496,40 +518,40 @@ class rdm_trans(osv.osv):
         trans = self._get_trans(cr, uid, trans_id, context)
         schemas_id = trans.schemas_id
         _logger.info('Total Coupon :' + str(trans.total_coupon))
+        coupon_data = {}
+        coupon_data.update({'customer_id':trans.customer_id.id})
+        coupon_data.update({'trans_id':trans.id})
+        coupon_data.update({'trans_type':'promo'})        
+        coupon_data.update({'coupon':trans.total_coupon})
+        coupon_data.update({'expired_date':schemas_id.end_date})
+        customer_coupon_id = self.pool.get('rdm.customer.coupon').create(cr, uid, coupon_data, context=context)                    
         for i in range (0,trans.total_coupon):
-            coupon_data = {}
-            coupon_data.update({'customer_id':trans.customer_id.id})
-            coupon_data.update({'trans_id':trans.id})
-            coupon_data.update({'trans_type':'promo'})
-            coupon_id = self.pool.get('ir.sequence').get(cr, uid, 'rdm.customer.coupon.sequence') 
-            _logger.info('Coupon ID : ' + coupon_id)      
-            coupon_data.update({'coupon_id':coupon_id})
-            _logger.info('End Date : ' + schemas_id.end_date)
-            #coupon_data.update({'expired_date':promo.end_date.strftime('%Y-%m-%d')})
-            coupon_data.update({'expired_date':schemas_id.end_date})
-            self.pool.get('rdm.customer.coupon').create(cr, uid, coupon_data, context=context)    
+            coupon_detail = {}
+            coupon_code = self.pool.get('ir.sequence').get(cr, uid, 'rdm.customer.coupon.sequence') 
+            _logger.info('Coupon ID : ' + coupon_code)     
+            coupon_detail.update({'customer_coupon_id':customer_coupon_id}) 
+            coupon_detail.update({'coupon_code':coupon_code})                        
+            coupon_detail.update({'expired_date':schemas_id.end_date})        
+            _logger.info('End Date : ' + schemas_id.end_date)            
+            self.pool.get('rdm.customer.coupon.detail').create(cr, uid, coupon_detail, context=context)
         _logger.info('End Generate Coupon')
             
     def _generate_point(self, cr, uid, trans_id, context=None):
         _logger.info('Start Generate Point')
         trans = self._get_trans(cr, uid, trans_id, context)
         schemas_id = trans.schemas_id
-        _logger.info('Total Point :' + str(trans.point))
-        for i in range (0,trans.coupon):
-            coupon_data = {}
-            coupon_data.update({'customer_id':trans.customer_id.id})
-            coupon_data.update({'trans_id':trans.id})
-            coupon_data.update({'trans_type':'promo'})
-            coupon_id = self.pool.get('ir.sequence').get(cr, uid, 'rdm.customer.coupon.sequence') 
-            _logger.info('Coupon ID : ' + coupon_id)      
-            coupon_data.update({'coupon_id':coupon_id})
-            _logger.info('End Date : ' + schemas_id.end_date)            
-            coupon_data.update({'expired_date':schemas_id.end_date})
-            self.pool.get('rdm.customer.coupon').create(cr, uid, coupon_data, context=context)    
+        _logger.info('Total Point :' + str(trans.total_point))
+        point_data = {}
+        point_data.update({'customer_id': trans.customer_id.id})
+        point_data.update({'trans_id':trans.id})
+        point_data.update({'trans_type': 'promo'})
+        point_data.update({'point':trans.total_point})
+        point_data.update({'expired_date': schemas_id.end_date})
+        self.pool.get('rdm.customer.point').create(cr, uid, point_data, context=context)
         _logger.info('End Generate Coupon')
-                    
+    
     _columns = {
-        'trans_id': fields.char('Transaction ID',size=10, readonly=True),
+        'trans_id': fields.char('Transaction ID',size=13, readonly=True),
         'customer_id': fields.many2one('rdm.customer','Customer',required=True),
         'type': fields.selection([('promo','Promo'),('point','Point')],'Type',readonly=True), 
         'schemas_id': fields.many2one('rdm.schemas','Schemas', readonly=True),        
@@ -543,14 +565,14 @@ class rdm_trans(osv.osv):
         'point': fields.integer('Point', readonly=True),
         'add_coupon': fields.integer('Additional Coupon', readonly=True),
         'add_point': fields.integer('Additional Point', readonly=True),
-        'trans_filter': fields.boolean('Trans Filter'),
+        'trans_filter': fields.boolean('Trans Filter', readonly=True),
         'state':  fields.selection(AVAILABLE_STATES, 'Status', size=16, readonly=True),
         'trans_detail_ids': fields.one2many('rdm.trans.detail','trans_id','Details'),
-        'customer_coupon_ids': fields.one2many('rdm.customer.coupon','trans_id','Coupons',readonly=True),
-        'customer_point_ids': fields.one2many('rdm.customer.point','trans_id','Points',readonly=True),        
+        'customer_coupon_ids': fields.one2many('rdm.customer.coupon','trans_id','Coupons'),
+        'customer_point_ids': fields.one2many('rdm.customer.point','trans_id','Points'),        
         'remark': fields.text('Remark',readonly=True),
-        'printed': fields.boolean('Printed'),
-        'reprint': fields.integer('Reprint'),
+        'printed': fields.boolean('Printed', readonly=True),
+        'reprint': fields.integer('Reprint', readonly=True),
         'reprint_remark': fields.text('Reprint Remark'),
         'deleted': fields.boolean('Deleted', readonly=True),
     }
@@ -561,7 +583,7 @@ class rdm_trans(osv.osv):
         'trans_filter': lambda *a: False,        
         'total_coupon': lambda *a: 0,
         'total_point': lambda *a: 0,      
-        'state': lambda *a: 'open',
+        'state': lambda *a: 'draft',
         'printed': lambda *a: False,
         'reprint': lambda *a: 0,
         'deleted': lambda *a: False,
@@ -570,6 +592,7 @@ class rdm_trans(osv.osv):
     _order = "create_date desc"
     
     def create(self, cr, uid, values, context=None):        
+        values.update({'state':'open'})
         trans_id = super(rdm_trans,self).create(cr, uid, values, context=context)
         #Set trans_id
         self._set_trans_id(cr, uid, trans_id, context)
@@ -578,15 +601,20 @@ class rdm_trans(osv.osv):
         #Checks Customer Filters
         self._get_customer_filters(cr, uid, trans_id, context)
         #Calculate Valid Total Amount
-        self._get_valid_total(cr, uid, trans_id, context)
-                
+        self._get_valid_total(cr, uid, trans_id, context)                
         return trans_id        
                  
     def write(self, cr, uid, ids, values, context=None ):
-        trans_id = ids[0]        
+        trans_id = ids[0]                
         trans = self._get_trans(cr, uid, trans_id, context)        
-        if trans['state'] == 'done':
-            raise osv.except_osv(('Warning'), ('Edit not allowed, Transaction already closed!'))            
+        if trans['state'] == 'done':            
+            if values.get('bypass') == True:
+                trans_data = {}
+                if values.get('method') == '_update_print_status':                                
+                    trans_data.update({'printed':values.get('printed')})
+                    result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
+            else: 
+                raise osv.except_osv(('Warning'), ('Edit not allowed, Transaction already closed!'))            
         else:
             result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)
             #Calculate Total Amount and Total Item
