@@ -9,9 +9,12 @@
                 <form string="Transaction" version="7.0">  
                     <header>
                         <button name="trans_close" string="Close" type="object" class="oe_highlight" states="open" confirm="Are you sure to close this transaction?"/>                                                
-                        <button name="print_receipt" String="Print" type="object" class="oe_highlight" attrs="{'invisible':[('printed','=',True)]}" states="done"/>
+                        <button name="print_receipt" String="Print" type="object" class="oe_highlight" attrs="{'invisible':[('printed','=',False)]}" states="done"/>
                         <button name="re_print" String="Re-Print" type="object" class="oe_highlight" states="done"/>
-                        <button name="trans_reset" String="Re-Open" type="object" class="oe_highlight" states="done"/>                      
+                        <button name="trans_reset" String="Re-Open" type="object" class="oe_highlight" states="done" groups="base.group_rdm_manager"/> 
+                        <button name="trans_req_delete" String="Request Delete" type="object" class="oe_highlight" states="done" groups="base.group_rdm_manager"/>
+                        <button name="reject_delete" String="Reject Delete" type="object" class="oe_highlight" states="req_delete" groups="base.group_rdm_manager"/>
+                        <button name="approve_delete" String="Approve Delete" type="object" class="oe_highlight" states="req_delete" groups="base.group_rdm_manager"/>                                              	                        	                    
                    </header> 
 					<sheet>											
 						<group colspan="4">
@@ -21,7 +24,7 @@
 						</group>						
 						<group colspan="4" string="Customer">
 							<h1>							
-								<field name="customer_id" domain="[('contact_type','=','customer')]"/>
+								<field name="customer_id" domain="[('contact_type','=','customer'),('state','=','active')]"/>
 							</h1>	
 						</group>						
 												
@@ -115,12 +118,12 @@
                 <form string="Transaction Detail" version="7.0">  
                     <group colspan="4">                    	
                         <field name="trans_date"/>            
-                        <field name="tenant_id"/>            
+                        <field name="tenant_id" domain="[('state','=','active')]"/>            
                         <field name="total_amount"/>
                         <field name="total_item"/>
                         <field name="payment_type"/>
                         <field name="bank_id" attrs="{'invisible':[('payment_type','==','cash')]}"/>
-                        <field name="bank_card_type" attrs="{'invisible':[('payment_type','==','cash')]}"/>
+                        <field name="bank_card_id" attrs="{'invisible':[('payment_type','==','cash')]}"/>
                         <field name="card_provider" attrs="{'invisible':[('payment_type','==','cash')]}"/>                      
                        	<field name="card_number" attrs="{'invisible':[('payment_type','==','cash')]}"/>
                        	

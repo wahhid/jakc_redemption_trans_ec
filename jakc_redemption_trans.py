@@ -10,6 +10,8 @@ AVAILABLE_STATES = [
     ('ready','Ready'),    
     ('open','Open'),    
     ('done', 'Closed'),
+    ('req_delete','Request For Delete'),
+    ('deleted','Deleted'),
 ]
 
 reportserver = '172.16.0.3'
@@ -53,14 +55,6 @@ class rdm_trans(osv.osv):
         self._generate_coupon(cr, uid, ids[0], context)     
         self._generate_point(cr, uid, ids[0], context)
         return True
-    
-    def _update_print_status(self, cr, uid, ids, context=None):
-        _logger.info("Update Print Status for ID : " + str(ids))
-        values = {}
-        values.update({'bypass':True})
-        values.update({'method':'_update_print_status'})
-        values.update({'printed':True})
-        self.write(cr, uid, ids, values, context=context)
                 
     def print_receipt(self, cr, uid, ids, context=None):
         _logger.info("Print Receipt for ID : " + str(ids))
@@ -78,16 +72,32 @@ class rdm_trans(osv.osv):
             'nodestroy': True,
             'target': 'new' 
         }        
-        
-    
+            
     def re_print(self, cr, uid, ids, context=None):
         _logger.info("Re-Print Receipt for ID : " + str(ids))
         return True
     
     def trans_reset(self, cr, uid, ids, context=None):
         _logger.info("Reset for ID : " + str(ids))
+        self.write(cr,uid,ids,{'state':'open'},context=context)
         return True
     
+    def trans_req_delete(self, cr, uid, ids, context=None):
+        _logger.info("Delete Request for ID : " + str(ids[0]))
+        self.write(cr,uid,ids,{'state':'req_delete'},context=context)         
+        return True
+    
+    def trans_delete(self, cr, uid, ids, context=None):
+        _logger.info("Delete Transaction for ID : " + str(ids[0]))
+        self.write(cr,uid,ids,{'state':'delete'},context=context) 
+        return True
+                                        
+    def _get_trans(self, cr, uid, trans_id , context=None):
+        return self.browse(cr, uid, trans_id, context=context);
+            
+    def _get_trans_detail(self, cr, uid, trans_id, context=None):
+        return self.pool.get('rdm.trans.detail').browse(cr, uid, trans_id, context=context)
+                         
     def _get_active_schemas(self, cr, uid, context=None):          
         _logger.info("Start Get Active Schemas")
         schemas_type = None            
@@ -110,14 +120,16 @@ class rdm_trans(osv.osv):
         else:                
             _logger.info("Active Promo not Found")
         _logger.info("End Get Active Promo")    
-        return schemas_id       
-                    
-    def _get_trans(self, cr, uid, trans_id , context=None):
-        return self.browse(cr, uid, trans_id, context=context);
-            
-    def _get_trans_detail(self, cr, uid, trans_id, context=None):
-        return self.pool.get('rdm.trans.detail').browse(cr, uid, trans_id, context=context)
-                          
+        return schemas_id  
+                             
+    def _update_print_status(self, cr, uid, ids, context=None):
+        _logger.info("Update Print Status for ID : " + str(ids))
+        values = {}
+        values.update({'bypass':True})
+        values.update({'method':'_update_print_status'})
+        values.update({'printed':True})
+        self.write(cr, uid, ids, values, context=context)
+                                  
     def _get_schemas_rules(self, cr, uid, schemas_id, context=None):
         ids = self.pool.get('rdm.schemas.rules').search(cr, uid, [('schemas_id','=',schemas_id)], context=context);
         return self.pool.get('rdm.schemas.rules').browse(cr, uid, ids, context=context)
@@ -220,6 +232,7 @@ class rdm_trans(osv.osv):
             
         status = segment_status and gender_status and religion_status and ethnic_status and marital_status and interest_status and cardtype_status
         message = segment_message + "\n" + gender_message + "\n" + religion_message + "\n" + ethnic_message + "\n" + marital_message + "\n" + interest_message + "\n" + cardtype_message
+        
         datas = {}
         if status == True:
             datas.update({'trans_filter':True})                                    
@@ -332,10 +345,20 @@ class rdm_trans(osv.osv):
         _logger.info('Start Calculate Add Coupon and Point')
         coupon = 0
         point = 0        
-        trans = self._get_trans(cr, uid, trans_id, context)
+        terbesar_trans_id = None
+        terbesar_trans_amount = 0
+        terbesar_trans_coupon = 0
+        terbesar_trans_point = 0        
+        
+        trans = self._get_trans(cr, uid, trans_id, context)        
+        
+        trans_coupon = trans.coupon
+        trans_point = trans.point
+        
         schemas_id = trans.schemas_id
         customer_id = trans.customer_id        
         rules_ids = schemas_id.rules_ids
+        
         for rules_id in rules_ids:
             #Check Rules Schemas
             #Birthday Schemas
@@ -349,18 +372,32 @@ class rdm_trans(osv.osv):
                 _logger.info('Start Birthday Schemas')
                 if today == birthdate :
                     _logger.info('Rules Birthday Match')
-                    if rules.apply_for == '1':
-                        if rules.operation == 'add':
-                            coupon = coupon + rules.quantity
-                        if rules.operation == 'multiple':
-                            coupon = coupon + rules.quantity
-                                                
-                    if rules.apply_for == '2':
-                        if rules.operation == 'add':
-                            point = point + rules.quantity
-                        if rules.operation == 'multiple':
-                            point = point + rules.quantity
-                                                        
+                    if rules.calculation == 'ditotal':
+                        if rules.apply_for == '1':
+                            if rules.operation == 'add':
+                                coupon = coupon + rules.quantity
+                            if rules.operation == 'multiple':
+                                coupon = coupon + (rules.quantity * trans.coupon)
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                point = point + rules.quantity
+                            if rules.operation == 'multiple':
+                                point = point + (rules.quantity * trans.point)
+                    else:
+                        terbesar_trans_id = rules.id                        
+                        if rules.apply_for == '1':                            
+                            if rules.operation == 'add':
+                                terbesar_trans_coupon = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_coupon = rules.quantity * trans.coupon                                
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                terbesar_trans_point = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_point = rules.quantity * trans.point
+                                                                                                         
                 _logger.info(today)                
                 _logger.info('End Birthday Schemas')
                                 
@@ -370,23 +407,66 @@ class rdm_trans(osv.osv):
                 today = datetime.date.today().strftime("%Y-%m-%d")
                 day = rules.day
                 if today == day :
-                    if rules.apply_for == '1':
-                        if rules.operation == 'add':
-                            coupon = coupon + rules.quantity
-                        if rules.operation == 'multiple':
-                            coupon = coupon + rules.quantity
-                                                
-                    if rules.apply_for == '2':
-                        if rules.operation == 'add':
-                            point = point + rules.quantity
-                        if rules.operation == 'multiple':
-                            point = point + rules.quantity
+                    if rules.calculation == 'ditotal':
+                        if rules.apply_for == '1':
+                            if rules.operation == 'add':
+                                coupon = coupon + rules.quantity
+                            if rules.operation == 'multiple':
+                                coupon = coupon + (rules.quantity * trans.coupon)
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                point = point + rules.quantity
+                            if rules.operation == 'multiple':
+                                point = point + (rules.quantity * trans.point)
+                    else:
+                        terbesar_trans_id = rules.id                        
+                        if rules.apply_for == '1':                            
+                            if rules.operation == 'add':
+                                terbesar_trans_coupon = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_coupon = rules.quantity * trans.coupon                                
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                terbesar_trans_point = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_point = rules.quantity * trans.point
 
                 _logger.info('End Day Schemas')
+                
             #Day Name Schemas
             if rules.rule_schema == 'dayname':
-                _logger.info('Start Day Name Schemas')
-                dayname = datetime.date.weekday()
+                _logger.info('Start Day Name Schemas')                
+                day_name_today = datetime.date.weekday()
+                day_name = rules.day_name
+                if day_name_today == rules.day_name:
+                    if rules.calculation == 'ditotal':
+                        if rules.apply_for == '1':
+                            if rules.operation == 'add':
+                                coupon = coupon + rules.quantity
+                            if rules.operation == 'multiple':
+                                coupon = coupon + (rules.quantity * trans.coupon)
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                point = point + rules.quantity
+                            if rules.operation == 'multiple':
+                                point = point + (rules.quantity * trans.point)
+                    else:
+                        terbesar_trans_id = rules.id                        
+                        if rules.apply_for == '1':                            
+                            if rules.operation == 'add':
+                                terbesar_trans_coupon = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_coupon = rules.quantity * trans.coupon                                
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                terbesar_trans_point = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_point = rules.quantity * trans.point                   
+                
                 
                 _logger.info('Start Day Name Schemas')
                 
@@ -400,20 +480,34 @@ class rdm_trans(osv.osv):
                     if customer_card_type.id == card_type.id:
                         card_type_rules = True
                 if card_type_rules == True:
-                    if rules.apply_for == '1':
-                        if rules.operation == 'add':
-                            coupon = coupon + rules.quantity
-                        if rules.operation == 'multiple':
-                            coupon = coupon + rules.quantity
-                                                
-                    if rules.apply_for == '2':
-                        if rules.operation == 'add':
-                            point = point + rules.quantity
-                        if rules.operation == 'multiple':
-                            point = point + rules.quantity                                                                
+                    if rules.calculation == 'ditotal':
+                        if rules.apply_for == '1':
+                            if rules.operation == 'add':
+                                coupon = coupon + rules.quantity
+                            if rules.operation == 'multiple':
+                                coupon = coupon + (rules.quantity * trans.coupon)
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                point = point + rules.quantity
+                            if rules.operation == 'multiple':
+                                point = point + (rules.quantity * trans.point)
+                    else:
+                        terbesar_trans_id = rules.id                        
+                        if rules.apply_for == '1':                            
+                            if rules.operation == 'add':
+                                terbesar_trans_coupon = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_coupon = rules.quantity * trans.coupon                                
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                terbesar_trans_point = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_point = rules.quantity * trans.point                                                              
                 _logger.info('Start Card Type Schemas')
                 
-            #Tenant Type
+            #Tenant Category
             if rules.rule_schema == 'tenanttype':
                 _logger.info('Start Tenant Type Schemas')
                 total_amount = 0                
@@ -435,41 +529,67 @@ class rdm_trans(osv.osv):
                 spend_amount = schemas_id.spend_amount
                 _logger.info('Spend Amount : ' + str(spend_amount))
                 
-                if total_amount > spend_amount:
-                    if rules.apply_for == '1':
-                        if rules.operation == 'add':
-                            add_coupon = (total_amount // schemas_id.spend_amount) + schemas_id.coupon
-                            coupon = coupon + add_coupon
-                        if rules.operation == 'multiple':
-                            add_coupon = (total_amount // schemas_id.spend_amount) * schemas_id.coupon
-                            coupon = coupon + add_coupon
-                                                
-                    if rules.apply_for == '2':
-                        if rules.operation == 'add':
-                            point = point + rules.quantity
-                        if rules.operation == 'multiple':
-                            point = point + rules.quantity
+                if total_amount >= spend_amount:
+                    if rules.calculation == 'ditotal':
+                        if rules.apply_for == '1':
+                            if rules.operation == 'add':
+                                coupon = coupon + rules.quantity
+                            if rules.operation == 'multiple':
+                                coupon = coupon + (rules.quantity * trans.coupon)
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                point = point + rules.quantity
+                            if rules.operation == 'multiple':
+                                point = point + (rules.quantity * trans.point)
+                    else:
+                        terbesar_trans_id = rules.id                        
+                        if rules.apply_for == '1':                            
+                            if rules.operation == 'add':
+                                terbesar_trans_coupon = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_coupon = rules.quantity * trans.coupon                                
+                                                    
+                        if rules.apply_for == '2':
+                            if rules.operation == 'add':
+                                terbesar_trans_point = rules.quantity                                
+                            if rules.operation == 'multiple':
+                                terbesar_trans_point = rules.quantity * trans.point
                                                                                                                                                                         
                 _logger.info('End Tenant Type Schemas')
                 
             #Bank Card
-            if rules.rule_schema == 'bankcard':
+            if rules.rule_schema == 'bankcard' :
                 _logger.info('Start Bank Card Schemas')
                 total_amount = 0
-                rules_bank_ids = rules.bank_ids
+                rules_bank_card_ids = rules.bank_card_ids
                 bank_card_list = {}
+                for rule_bank_card in rules_bank_card_ids:
+                    rule_bank_card_id = rule_bank_card.bank_card_id.id
+                    rule_bank_card_name = rule_bank_card.bank_card_id.name
+                    bank_card_list.update({rule_bank_card_id:rule_bank_card_name})
+                    
+                _logger.info('End Bank Card Schemas')
+                
+            #Bank and Bank Card
+            if rules.rule_schema == 'bank':
+                _logger.info('Start Bank  Schemas')
+                total_amount = 0
+                rules_bank_ids = rules.bank_ids
+                bank_list = {} 
                 for rules_bank in rules_bank_ids:
                     rules_bank_id = rules_bank.bank_id.id
                     rules_bank_name = rules_bank.bank_id.name
-                    bank_card_list.update({rules_bank_id:rules_bank_name})
+                    bank_list.update({rules_bank_id:rules_bank_name})
                     
                 trans_detail_ids = trans.trans_detail_ids
                 for trans_detail in trans_detail_ids:                    
                     if trans_detail.payment_type == 'creditcard' or trans_detail.payment_type == 'debit':
                         bank_id  =  trans_detail.bank_id
-                        if bank_id.id in bank_card_list.keys():
+                        if bank_id.id in bank_list.keys():
                             total_amount = total_amount + trans_detail.total_amount
                 _logger.info('Total Amount : ' + str(total_amount))
+                spend_amount = schemas_id.spend_amount
                 
                 if total_amount > spend_amount:
                     if rules.apply_for == '1':
@@ -489,10 +609,18 @@ class rdm_trans(osv.osv):
                             point = point + add_coupon                                                                                   
                     
                     coupon = coupon + add_coupon
-                    _logger.info('Coupon : ' + str(coupon))
+                    _logger.info('Coupon : ' + str(coupon))                        
+                _logger.info('End Bank Card Schemas')
                         
-                _logger.info('End Bank Card Schemas')        
-                
+            #Customer Age
+            if rules.rule_schema == 'bank':
+               _logger.info('Start Customer Age Schemas')               
+               _logger.info('End Customer Age Schemas')
+            
+            if terbesar_trans_id is not None:
+                coupon = coupon + terbesar_trans_coupon
+                point = point + terbesar_trans_point
+                   
         trans_data = {}
         trans_data.update({'add_coupon':coupon})
         trans_data.update({'add_point':point})
@@ -643,44 +771,23 @@ class rdm_trans_detail(osv.osv):
         'total_item': fields.integer('Total Item'),
         'payment_type': fields.selection([('cash','Cash'),('creditcard','Credit Card'),('debit','Debit')],'Payment Type',required=True),
         'bank_id': fields.many2one('rdm.bank','Bank'),
-        'bank_card_type': fields.selection([('silver','Silver'),('gold','Gold')],'Bank Card Type'),                
+        'bank_filter': fields.boolean('Bank Filter'),        
+        'bank_card_id': fields.many2one('rdm.bank.card','Bank Card'),              
         'card_provider': fields.selection([('visa','Visa'),('master','Master')],'Card Provider'),        
         'card_number': fields.char('Card Number', size=20),          
-        'deleted': fields.boolean('Deleted'),      
+        'state': fields.selection(AVAILABLE_STATES,'Status',size=16,readonly=True),      
     }
     
     _defaults = {
         'trans_date': fields.date.context_today, 
         'payment_type': lambda *a: 'cash',
         'tenant_filter': lambda *a: False,
+        'state': lambda *a: 'draft',
     }
     
     def unlink(self, cr, uid, ids, context=None):
         data = {}
-        data.update({'deleted': True})
+        data.update({'state': 'deleted'})
         super(rdm_trans_detail,self).write(cr, uid, ids, data, context=context)
                 
 rdm_trans_detail()
-
-#class rdm_promo_trans_detail_bank(osv.osv):
-#    _name = "rdm.promo.trans.detail.bank"
-#    _description = "Redemption Promo Transaction Detail Bank"
-#    _columns = {
-#        'promo_trans_detail_id': fields.many2one('rdm.promo.trans.detail','Transaction Detail',required=True),
-#        'bank_card_id': fields.many2one('rdm.bank.card','Bank Card',required=True),
-#        'total_amount': fields.float('Total Amount'),
-#    }
-    
-#rdm_promo_trans_detail_bank()
-
-#class rdm_promo_trans_detail_tenant(osv.osv):
-#    _name = "rdm.promo.trans.detail.tenant"
-#    _description = "Redemption Promo Transaction Detail Tenant"
-#    _columns = {
-#        'promo_trans_detail_id': fields.many2one('rdm.promo.trans.detail','Transaction Detail',required=True),
-#        'tenant_id': fields.many2one('rdm.tenant','Tenant',required=True),
-#        'total_amount': fields.float('Total Amount'),
-#    }
-#    
-#rdm_promo_trans_detail_tenant()
-
