@@ -10,6 +10,8 @@ AVAILABLE_STATES = [
     ('ready','Ready'),    
     ('open','Open'),    
     ('done', 'Closed'),
+    ('req_delete','Request For Delete'),
+    ('delete','Deleted'),
 ]
 
 reportserver = '172.16.0.3'
@@ -88,6 +90,17 @@ class rdm_trans(osv.osv):
         _logger.info("Reset for ID : " + str(ids))
         return True
     
+    def trans_req_delete(self, cr, uid, ids, context=None):
+        self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
+        trans_id = ids[0]
+        trans_detail_ids = trans_id.trans_detail_ids
+        self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail_ids, {'state':'req_delete'})
+        customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+        self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
+        customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+        self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'req_delete'})
+        return True
+        
     def _get_active_schemas(self, cr, uid, context=None):          
         _logger.info("Start Get Active Schemas")
         schemas_type = None            

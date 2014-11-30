@@ -60,6 +60,7 @@
 	                                    <field name="bank_id"/>                                    
 	                                    <field name="card_number"/>
 	                                    <field name="tenant_filter" attrs="{'invisible': True}"/>
+	                                    <field name="state"/>
 	                                </tree>
 	                            </field>
 	                        </page>              
@@ -71,7 +72,8 @@
 	                            	<tree string="Coupons">                                                                                                	
 	                                	<field name="trans_type"/>	
 	                                	<field name="coupon"/>	                                	
-	                                	<field name="expired_date"/>                                                                                                                                                                                                                                      
+	                                	<field name="expired_date"/>
+	                                	<field name="state"/>                                                                                                                                                                                                                                      
 	                            	</tree>                    
 	                        	</field>
 	                    	</page>
@@ -80,7 +82,8 @@
 	                            	<tree string="Points">                                                                                                	
 	                                	<field name="trans_type"/>
 	                                	<field name="point"/>
-	                                	<field name="expired_date"/>                                                                                                                                                                                                                                      
+	                                	<field name="expired_date"/>
+	                                	<field name="state"/>                                                                                                                                                                                                                                      
 	                            	</tree>                    
 	                        	</field>
 	                    	</page>				                                                								                    
