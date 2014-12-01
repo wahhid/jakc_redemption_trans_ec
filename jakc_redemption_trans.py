@@ -674,26 +674,3 @@ class rdm_trans_detail(osv.osv):
         super(rdm_trans_detail,self).write(cr, uid, ids, data, context=context)
                 
 rdm_trans_detail()
-
-#class rdm_promo_trans_detail_bank(osv.osv):
-#    _name = "rdm.promo.trans.detail.bank"
-#    _description = "Redemption Promo Transaction Detail Bank"
-#    _columns = {
-#        'promo_trans_detail_id': fields.many2one('rdm.promo.trans.detail','Transaction Detail',required=True),
-#        'bank_card_id': fields.many2one('rdm.bank.card','Bank Card',required=True),
-#        'total_amount': fields.float('Total Amount'),
-#    }
-    
-#rdm_promo_trans_detail_bank()
-
-#class rdm_promo_trans_detail_tenant(osv.osv):
-#    _name = "rdm.promo.trans.detail.tenant"
-#    _description = "Redemption Promo Transaction Detail Tenant"
-#    _columns = {
-#        'promo_trans_detail_id': fields.many2one('rdm.promo.trans.detail','Transaction Detail',required=True),
-#        'tenant_id': fields.many2one('rdm.tenant','Tenant',required=True),
-#        'total_amount': fields.float('Total Amount'),
-#    }
-#    
-#rdm_promo_trans_detail_tenant()
-
