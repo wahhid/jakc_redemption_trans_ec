@@ -659,6 +659,7 @@ class rdm_trans_detail(osv.osv):
         'bank_card_type': fields.selection([('silver','Silver'),('gold','Gold')],'Bank Card Type'),                
         'card_provider': fields.selection([('visa','Visa'),('master','Master')],'Card Provider'),        
         'card_number': fields.char('Card Number', size=20),          
+        'state':  fields.selection(AVAILABLE_STATES, 'Status', size=16, readonly=True),
         'deleted': fields.boolean('Deleted'),      
     }
     
