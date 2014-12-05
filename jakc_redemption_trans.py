@@ -95,7 +95,9 @@ class rdm_trans(osv.osv):
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
         trans_detail_ids = trans.trans_detail_ids
-        self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail_ids, {'state':'req_delete'})
+        for trans_detail in trans_detail_ids:
+            self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})
+            
         customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
         self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
         customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
