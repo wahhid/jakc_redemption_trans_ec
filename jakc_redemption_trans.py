@@ -99,9 +99,9 @@ class rdm_trans(osv.osv):
             self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})
             
         customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-        self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
+        self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids[0], {'state':'req_delete'})
         customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-        self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'req_delete'})
+        self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids[0], {'state':'req_delete'})
         return True
         
     def _get_active_schemas(self, cr, uid, context=None):          
