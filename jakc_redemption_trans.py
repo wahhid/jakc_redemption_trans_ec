@@ -93,7 +93,8 @@ class rdm_trans(osv.osv):
     def trans_req_delete(self, cr, uid, ids, context=None):
         #self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
         trans_id = ids[0]
-        trans_detail_ids = trans_id.trans_detail_ids
+        trans = self._get_trans_detail(cr, uid, trans_id, context)
+        trans_detail_ids = trans.trans_detail_ids
         self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail_ids, {'state':'req_delete'})
         customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
         self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
