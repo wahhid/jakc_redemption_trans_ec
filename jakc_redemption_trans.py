@@ -91,7 +91,7 @@ class rdm_trans(osv.osv):
         return True
     
     def trans_req_delete(self, cr, uid, ids, context=None):
-        self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
+        #self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
         trans_id = ids[0]
         trans_detail_ids = trans_id.trans_detail_ids
         self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail_ids, {'state':'req_delete'})
