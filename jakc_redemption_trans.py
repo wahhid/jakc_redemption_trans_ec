@@ -94,15 +94,16 @@ class rdm_trans(osv.osv):
         #self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
-        self.pool.get('rdm.trans').write(cr, uid, trans_id, {'state':'req_delete'})
+        self.write(cr, uid, ids, {'state':'req_delete'})
+        
         trans_detail_ids = trans.trans_detail_ids
         for trans_detail in trans_detail_ids:
             self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})
             
         customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-        self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids[0], {'state':'req_delete'})
+        self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
         customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-        self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids[0], {'state':'req_delete'})
+        self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'req_delete'})
         return True
         
     def trans_del_approve(self, cr, uid, ids, context=None):
