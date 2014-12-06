@@ -94,7 +94,11 @@ class rdm_trans(osv.osv):
         #self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
-        self.write(cr, uid, ids, {'state':'req_delete'})
+        values = {}
+        values.update({'bypass':True})
+        values.update({'method': 'trans_req_delete'})
+        values.update({'state': 'req_delete'})
+        self.write(cr, uid, ids, values, context=context)
         
         trans_detail_ids = trans.trans_detail_ids
         for trans_detail in trans_detail_ids:
@@ -664,6 +668,8 @@ class rdm_trans(osv.osv):
                 if values.get('method') == '_update_print_status':                                
                     trans_data.update({'printed':values.get('printed')})
                     result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
+                if values.get('method') == 'trans_del_request':
+                    result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)   
             else: 
                 raise osv.except_osv(('Warning'), ('Edit not allowed, Transaction already closed!'))            
         else:
