@@ -12,7 +12,9 @@
                         <button name="print_receipt" String="Print" type="object" class="oe_highlight" attrs="{'invisible':[('printed','=',True)]}" states="done"/>
                         <button name="re_print" String="Re-Print" type="object" class="oe_highlight" states="done"/>
                         <button name="trans_reset" String="Re-Open" type="object" class="oe_highlight" states="done"/>
-                        <button name="trans_req_delete" String="Request For Delete" type="object" class="oe_highlight" states="done"/>                      
+                        <button name="trans_req_delete" String="Request For Delete" type="object" class="oe_highlight" states="done"/>
+                        <button name="trans_del_approve" String="Approve For Delete" type="object" class="oe_highlight" states="req_delete"/>
+                        <button name="trans_del_reject" String="Reject For Delete" type="object" class="oe_highlight" states="req_delete"/>                      
                    </header> 
 					<sheet>											
 						<group colspan="4">

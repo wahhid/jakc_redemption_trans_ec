@@ -104,6 +104,39 @@ class rdm_trans(osv.osv):
         self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids[0], {'state':'req_delete'})
         return True
         
+    def trans_del_approve(self, cr, uid, ids, context=None):
+        trans_id = ids[0]
+        trans = self._get_trans(cr, uid, trans_id, context)
+        rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
+        if rdm_config.trans_delete_approver.user_id == uid:
+            trans_detail_ids = trans.trans_detail_ids
+            for trans_detail in trans_detail_ids:
+                self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'delete'})
+            
+            customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+            self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids[0], {'state':'delete'})
+            customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+            self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids[0], {'state':'delete'})            
+        else:
+            raise osv.except_osv(('Warning'), ('Approve Process not allowed!')) 
+        
+        
+    def trans_del_reject(self, cr, uid, ids, context=None):
+        trans_id = ids[0]
+        trans = self._get_trans(cr, uid, trans_id, context)
+        rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
+        if rdm_config.trans_delete_approver.user_id == uid:
+            trans_detail_ids = trans.trans_detail_ids
+            for trans_detail in trans_detail_ids:
+                self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'done'})
+            
+            customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+            self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids[0], {'state':'done'})
+            customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+            self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids[0], {'state':'done'})            
+        else:
+            raise osv.except_osv(('Warning'), ('Reject Process not allowed!')) 
+        
     def _get_active_schemas(self, cr, uid, context=None):          
         _logger.info("Start Get Active Schemas")
         schemas_type = None            
