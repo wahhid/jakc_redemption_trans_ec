@@ -24,14 +24,13 @@ class rdm_trans_receipt_report(osv.osv_memory):
     } 
         
     def generate_report(self, cr, uid, ids, context=None):
+        rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context)
         params = self.browse(cr, uid, ids, context=context)
         param = params[0]   
-        serverUrl = 'http://' + reportserver + ':' + reportserverport +'/jasperserver'
-        j_username = 'rdm_operator'
-        j_password = 'rdm123'
+        serverUrl = 'http://' + rdm_config.report_server + ':' + rdm_config.report_server_port +'/jasperserver'
         ParentFolderUri = '/rdm'
         reportUnit = '/rdm/rdm_trans_receipt_report'
-        url = serverUrl + '/flow.html?_flowId=viewReportFlow&standAlone=true&_flowId=viewReportFlow&ParentFolderUri=' + ParentFolderUri + '&reportUnit=' + reportUnit + '&ID=' +  param.id + '&decorate=no&j_username=' + j_username + '&j_password=' + j_password
+        url = serverUrl + '/flow.html?_flowId=viewReportFlow&standAlone=true&_flowId=viewReportFlow&ParentFolderUri=' + ParentFolderUri + '&reportUnit=' + reportUnit + '&ID=' +  param.id + '&decorate=no&j_username=' + rdm_config.report_user + '&j_password=' + rdm_config.report_password
         return {
             'type':'ir.actions.act_url',
             'url': url,
@@ -142,10 +141,16 @@ class rdm_trans(osv.osv):
         trans = self._get_trans(cr, uid, trans_id, context)
         rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
         if rdm_config.trans_delete_approver.user_id.id == uid:
+            values = {}
+            values.update({'bypass':True})
+            values.update({'method': 'trans_del_approve'})
+            values.update({'state': 'delete'})
+            self.write(cr, uid, ids, values, context=context)
+            
             trans_detail_ids = trans.trans_detail_ids
             for trans_detail in trans_detail_ids:
                 self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'delete'})
-            
+                
             customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
             self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids[0], {'state':'delete'})
             customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
@@ -159,6 +164,12 @@ class rdm_trans(osv.osv):
         trans = self._get_trans(cr, uid, trans_id, context)
         rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
         if rdm_config.trans_delete_approver.user_id.id == uid:
+            values = {}
+            values.update({'bypass':True})
+            values.update({'method': 'trans_del_reject'})
+            values.update({'state': 'done'})
+            self.write(cr, uid, ids, values, context=context)
+            
             trans_detail_ids = trans.trans_detail_ids
             for trans_detail in trans_detail_ids:
                 self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'done'})
@@ -708,7 +719,7 @@ class rdm_trans(osv.osv):
                 if values.get('method') == '_update_print_status':                                
                     trans_data.update({'printed':values.get('printed')})
                     result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
-                if values.get('method') == 'trans_req_delete':
+                if values.get('method') == 'trans_req_delete' or values.get('method') == 'trans_del_approve' or values.get('method') == 'trans_del_reject':
                     trans_data.update({'state':values.get('state')})
                     result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)   
             else: 
