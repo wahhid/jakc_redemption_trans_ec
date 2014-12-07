@@ -101,20 +101,41 @@ class rdm_trans(osv.osv):
             values.update({'method': 'trans_req_delete'})
             values.update({'state': 'req_delete'})
             self.write(cr, uid, ids, values, context=context)
-            
             trans_detail_ids = trans.trans_detail_ids
             for trans_detail in trans_detail_ids:
                 self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})
-                
             customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
             self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
             customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
             self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'req_delete'})
+            #Send Email to Approver
+            email_data = {}
+            email_data.update({'email_from':'info@taman-anggrek-mall.com'})
+            approver_id = rdm_config.trans_delete_approver
+            approver = self.pool.get('hr.employee').browse(cr, uid, approver_id, context=context)
+            email_data.update({'email_to':approver.email})
+            subject = 'Request for Delete Transaction'
+            email_data.update({'subject':subject})
+            href =' http://' + rdm_config.rdm_server + ':8069/#id=' + trans_id + '&view_type=form&model=rdm.trans&menu_id=131&action=114'
+            msg = '<br/>'.join([
+                    'Dear ' + approver.name,
+                    '',
+                    '',
+                    'Please review this Delete Transaction Request',
+                    '<a href="">Click here</a>'
+                    '',
+                    '',
+                    'Regards',
+                    '',
+                    '',
+                    'Redemption and Point Management System'
+                ])
+            email_data.update({'body_html': msg})
             return True
         else:
             raise osv.except_osv(('Warning'), ('Request for delete not allowed!'))
         
-        
+    
     def trans_del_approve(self, cr, uid, ids, context=None):
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
@@ -610,6 +631,19 @@ class rdm_trans(osv.osv):
         self.pool.get('rdm.customer.point').create(cr, uid, point_data, context=context)
         _logger.info('End Generate Coupon')
     
+    def _send_email_notification(self, cr, uid, values, context=None):
+        _logger.info(values['Start Send Email Notification'])
+        mail_mail = self.pool.get('mail.mail')
+        mail_ids = []
+        mail_ids.append(mail_mail.create(cr, uid, {
+            'email_from': values['email_from'],
+            'email_to': values['email_to'],
+            'subject': values['subject'],
+            'body_html': values['body_html'],
+            }, context=context))
+        mail_mail.send(cr, uid, mail_ids, context=context)
+        _logger.info(values['End Send Email Notification'])
+        
     _columns = {
         'trans_id': fields.char('Transaction ID',size=13, readonly=True),
         'customer_id': fields.many2one('rdm.customer','Customer',required=True),
@@ -674,8 +708,8 @@ class rdm_trans(osv.osv):
                     trans_data.update({'printed':values.get('printed')})
                     result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
                 if values.get('method') == 'trans_req_delete':
-                    trans_data.update({''})
-                    result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)   
+                    trans_data.update({'state':values.get('state')})
+                    result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)   
             else: 
                 raise osv.except_osv(('Warning'), ('Edit not allowed, Transaction already closed!'))            
         else:
