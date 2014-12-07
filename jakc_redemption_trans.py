@@ -673,7 +673,7 @@ class rdm_trans(osv.osv):
                 if values.get('method') == '_update_print_status':                                
                     trans_data.update({'printed':values.get('printed')})
                     result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
-                if values.get('method') == 'trans_del_request':
+                if values.get('method') == 'trans_req_delete':
                     trans_data.update({''})
                     result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)   
             else: 
