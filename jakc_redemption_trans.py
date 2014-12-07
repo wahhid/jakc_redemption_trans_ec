@@ -141,7 +141,7 @@ class rdm_trans(osv.osv):
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
         rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
-        if rdm_config.trans_delete_approver.user_id == uid:
+        if rdm_config.trans_delete_approver.user_id.id == uid:
             trans_detail_ids = trans.trans_detail_ids
             for trans_detail in trans_detail_ids:
                 self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'delete'})
@@ -158,7 +158,7 @@ class rdm_trans(osv.osv):
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
         rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
-        if rdm_config.trans_delete_approver.user_id == uid:
+        if rdm_config.trans_delete_approver.user_id.id == uid:
             trans_detail_ids = trans.trans_detail_ids
             for trans_detail in trans_detail_ids:
                 self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'done'})
