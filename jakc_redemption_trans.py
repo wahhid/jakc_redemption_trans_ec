@@ -94,21 +94,26 @@ class rdm_trans(osv.osv):
         #self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
-        values = {}
-        values.update({'bypass':True})
-        values.update({'method': 'trans_req_delete'})
-        values.update({'state': 'req_delete'})
-        self.write(cr, uid, ids, values, context=context)
-        
-        trans_detail_ids = trans.trans_detail_ids
-        for trans_detail in trans_detail_ids:
-            self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})
+        rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
+        if rdm_config.trans_delete_allowed == True:
+            values = {}
+            values.update({'bypass':True})
+            values.update({'method': 'trans_req_delete'})
+            values.update({'state': 'req_delete'})
+            self.write(cr, uid, ids, values, context=context)
             
-        customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-        self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
-        customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-        self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'req_delete'})
-        return True
+            trans_detail_ids = trans.trans_detail_ids
+            for trans_detail in trans_detail_ids:
+                self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})
+                
+            customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+            self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
+            customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
+            self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'req_delete'})
+            return True
+        else:
+            raise osv.except_osv(('Warning'), ('Request for delete not allowed!'))
+        
         
     def trans_del_approve(self, cr, uid, ids, context=None):
         trans_id = ids[0]
@@ -669,6 +674,7 @@ class rdm_trans(osv.osv):
                     trans_data.update({'printed':values.get('printed')})
                     result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
                 if values.get('method') == 'trans_del_request':
+                    trans_data.update({''})
                     result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)   
             else: 
                 raise osv.except_osv(('Warning'), ('Edit not allowed, Transaction already closed!'))            
