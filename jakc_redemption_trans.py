@@ -116,7 +116,7 @@ class rdm_trans(osv.osv):
             email_data.update({'email_to':approver.work_email})
             subject = 'Request for Delete Transaction'
             email_data.update({'subject':subject})
-            href =' http://' + rdm_config.rdm_server + ':8069/#id=' + trans_id + '&view_type=form&model=rdm.trans&menu_id=131&action=114'
+            href =' http://' + rdm_config.rdm_server + ':8069/#id=' + str(trans_id) + '&view_type=form&model=rdm.trans&menu_id=131&action=114'
             msg = '<br/>'.join([
                     'Dear ' + approver.name,
                     '',
