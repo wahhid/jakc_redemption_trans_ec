@@ -24,7 +24,7 @@
 						</group>						
 						<group colspan="4" string="Customer">
 							<h1>							
-								<field name="customer_id" domain="[('contact_type','=','customer')]"/>
+								<field name="customer_id" domain="[('contact_type','=','customer'),('state','=','active')]" />
 							</h1>	
 						</group>						
 												
