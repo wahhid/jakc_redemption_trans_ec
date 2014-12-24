@@ -18,27 +18,23 @@
 					<sheet>											
 						<group colspan="4">
 							<h1>
-								<field name="schemas_id"/>		
+								<field name="trans_id"/>   		
 							</h1>															
 						</group>						
 						<group colspan="4" string="Customer">
 							<h1>							
 								<field name="customer_id" domain="[('contact_type','=','customer'),('state','=','active')]" />
 							</h1>	
-						</group>						
-												
-						<group colspan="4" string="General information">
-							<field name="trans_id"/>                            	                    		                       
+						</group>																		
+						<group colspan="4" string="General information">							                         	                    		                      
 	                        <field name="type"/>	                         						                     
-	                        <field name="trans_date"/>
-	                       	<field name="trans_filter"/>	     
+	                        <field name="trans_date"/>	                       		    
 	                        <field name="state"/>       
 							<field name="printed"/>                            	
 	                    </group>            
 						<group colspan="2">
 							<group string="Amount and Item">
-		                        <field name="total_amount"/>
-		                        <field name="valid_amount"/>
+		                        <field name="total_amount"/>		                        
 		                        <field name="total_item"/>       																
 							</group>
 							<group string="Coupon and Point">
@@ -66,9 +62,17 @@
 	                                </tree>
 	                            </field>
 	                        </page>              
-							<page string="Remarks">  
-	                       		<field name="remark"/>                         
-	                        </page>                          
+	                        <page string="Schemas">
+	                        	<field name="trans_schemas_ids" widget="one2many_list" nolabel="1">
+	                            	<tree string="Schemas">
+	                            	    <field name="schemas_id"/>	                            	    
+	                                	<field name="valid_amount"/>	
+	                                	<field name="total_coupon"/>	                                	
+	                                	<field name="total_point"/>	                                	
+	                                	<field name="state"/>                                                                                                                                                                                                                                      
+	                            	</tree>                    
+	                        	</field>
+	                        </page>
 							<page string="Transaction Coupons">
 	                        	<field name="customer_coupon_ids" widget="one2many_list" nolabel="1">
 	                            	<tree string="Coupons">                                                                                                	

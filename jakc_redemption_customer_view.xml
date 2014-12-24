@@ -10,8 +10,7 @@
                 <notebook position="inside">
                     <page string="Transaction">
                         <field name="trans_ids" widget="one2many_list" nolabel="1">
-                            <tree>                   
-                            	<field name="schemas_id"/>                                            
+                            <tree>                                                               
                                 <field name="trans_date"/>                                
                                 <field name="total_amount"/>                                                                        
                                 <field name="total_item"/>                                                                        

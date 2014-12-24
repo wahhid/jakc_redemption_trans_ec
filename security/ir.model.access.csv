@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_rdm_promo_trans_manager,rdm.promo.trans.manager,model_rdm_promo_trans,base.group_rdm_manager,1,1,1,1
-access_rdm_promo_trans_operator,rdm.promo.trans.operator,model_rdm_promo_trans,base.group_rdm_operator,1,0,1,0
+access_rdm_trans_manager,rdm.trans.manager,model_rdm_trans,base.group_rdm_manager,1,1,1,1
+access_rdm_trans_operator,rdm.trans.operator,model_rdm_trans,base.group_rdm_operator,1,0,1,0
+access_rdm_trans_schemas_manager,rdm.trans.schemas.manager,model_rdm_trans_schemas,base.group_rdm_manager,1,1,1,1
+access_rdm_trans_schemas_operator,rdm.trans.schemas.operator,model_rdm_trans_schemas,base.group_rdm_operator,1,0,1,0
