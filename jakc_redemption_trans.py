@@ -538,8 +538,59 @@ class rdm_trans(osv.osv):
                             if operation == 'and':
                                 status = status and False
                                 
-                        rule_datas.update({'rule_schema': 'gender'})                                            
+                        rule_datas.update({'rule_schema': 'gender'})                                    
+                        
+                    #Day Schemas
+                    if rules.rule_schema == 'day':
+                        _logger.info('Start Day Schemas')                
+                        today = datetime.date.today().strftime("%Y-%m-%d")
+                        day = rules.day
+                        if today == day :
+                            _logger.info('Match Day : ' + today)
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False
+                                
+                        rule_datas.update({'rule_schema': 'day'})
+                    
+                    #Day Name Schemas
+                    if rules.rule_schema == 'dayname':
+                        _logger.info('Start Day Name Schemas')
+                        dayname = datetime.date.weekday()    
+                                        
+                        _logger.info('Start Day Name Schemas')     
+                                    
+                    #Card Type
+                    if rules.rule_schema == 'cardtype':
+                        card_type_rules = False
+                        _logger.info('Start Card Type Schemas')
+                        customer_card_type = customer_id.card_type
+                        card_type_ids = rules.card_type_ids
+                        for card_type in card_type_ids:
+                            if customer_card_type.id == card_type.id:
+                                card_type_rules = True
+                                
+                        if card_type_rules == True:
+                            _logger.info('Match Card Type')
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False
                             
+                                
+                    
+                    
                 if status:            
                     if 'bank' in rule_datas.values() or  'bankcard' in rule_datas.values() or 'tenanttype' in rule_datas.values():                        
                         if 'bank' in rule_datas.values():
