@@ -457,6 +457,7 @@ class rdm_trans(osv.osv):
             #super(rdm_trans,self).write(cr, uid, [trans_id], trans_data, context=context)
             self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id.id], trans_schemas_data, context=context)
             
+            
         _logger.info('End Calculate Coupon and Point')
     
     def _calculate_add_coupon_and_point(self, cr, uid, trans_id, context=None):
@@ -541,7 +542,7 @@ class rdm_trans(osv.osv):
                         rule_datas.update({'rule_schema': 'gender'})                                    
                         
                     #Day Schemas
-                    if rules.rule_schema == 'day':
+                    if rule_schema == 'day':
                         _logger.info('Start Day Schemas')                
                         today = datetime.date.today().strftime("%Y-%m-%d")
                         day = rules.day
@@ -560,14 +561,42 @@ class rdm_trans(osv.osv):
                         rule_datas.update({'rule_schema': 'day'})
                     
                     #Day Name Schemas
-                    if rules.rule_schema == 'dayname':
-                        _logger.info('Start Day Name Schemas')
-                        dayname = datetime.date.weekday()    
-                                        
-                        _logger.info('Start Day Name Schemas')     
+                    if rule_schema == 'dayname':
+                        _logger.info('Start Day Name Schemas')                        
+                        weekday = datetime.datetime.today().weekday()                        
+                        dayname = rules_detail_id.day_name
+                        if weekday == 0:
+                            day = '01'
+                        if weekday == 1:
+                            day = '02'
+                        if weekday == 2:
+                            day = '03'
+                        if weekday == 3:
+                            day = '04'
+                        if weekday == 4:
+                            day = '05'
+                        if weekday == 5:
+                            day = '06'
+                        if weekday == 6:
+                            day = '07'
+                                       
+                        if dayname == day:
+                            _logger.info('Match Day Name : ' + day)
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False
+                                
+                        rule_datas.update({'rule_schema': 'dayname'})                                                                                                        
+                        _logger.info('End Day Name Schemas')     
                                     
                     #Card Type
-                    if rules.rule_schema == 'cardtype':
+                    if rule_schema == 'cardtype':
                         card_type_rules = False
                         _logger.info('Start Card Type Schemas')
                         customer_card_type = customer_id.card_type
@@ -587,16 +616,124 @@ class rdm_trans(osv.osv):
                                 status = status or False
                             if operation == 'and':
                                 status = status and False
-                            
-                                
+                        rule_datas.update({'rule_schema': 'cardtype'})
+                                                                                                
+                    #Age
+                    if rule_schema == 'age':
+                        _logger.info('Start Age Schemas')
+                        customer_birthdate = datetime.datetime.strptime(customer_id.birth_date , '%Y-%m-%d')                        
+                        customer_age_diff =  datetime.datetime.now() - customer_birthdate
+                        customer_age = (customer_age_diff.days + customer_age_diff.seconds/86400)/365                                            
+                        age_ids = rules.age_ids
+                        age_rules = False
+                        for age_id in age_ids:
+                            if age_id.operator == 'eq':
+                                if customer_age == age_id.value1:
+                                    age_rules = True
+                            if age_id.operator == 'ne':
+                                if customer_age != age_id.value1:
+                                    age_rules = True                                    
+                            if age_id.operator == 'lt':
+                                if customer_age < age_id.value1:
+                                    age_rules = True
+                            if age_id.operator == 'gt':
+                                if customer_age > age_id.value1:
+                                    age_rules = True
+                            if age_id.operator == 'bw':
+                                if customer_age >= age_id.value1 and customer_age <= age_id.value2:
+                                    age_rules = True
+                        
+                        if age_rules == True:
+                            _logger.info('Match Age')
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False                                                        
+                        
+                        rule_datas.update({'rule_schema': 'age'})
+                        _logger.info('End Age Schemas')
+                     
+                    #Tenant Type     
+                    if rule_schema == 'tenanttype':
+                        _logger.info('Start Tenant Type Schemas')                                                
+                        if True:                        
+                            _logger.info('Match Tenant Type')
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False     
+                        rule_datas.update({'rule_schema': 'tenanttype'})                       
+                        _logger.info('End Tenant Type Schemas')
+
+                    #Tenant     
+                    if rule_schema == 'tenant':
+                        _logger.info('Start Tenant Schemas')
+                                                                        
+                        if True:                        
+                            _logger.info('Match Tenant')
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False     
+                        rule_datas.update({'rule_schema': 'tenant'})                       
+                        _logger.info('End Tenant Schemas')
+
+
+                    #Bank     
+                    if rule_schema == 'bank':
+                        _logger.info('Start Bank Schemas')                                                
+                        if True:                        
+                            _logger.info('Match Bank')
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False     
+                        rule_datas.update({'rule_schema': 'bank'})                       
+                        _logger.info('End Bank Schemas')
                     
-                    
+                    #Bank Card     
+                    if rule_schema == 'bankcard':
+                        _logger.info('Start Bank Card Schemas')                                                
+                        if True:                        
+                            _logger.info('Match Bank Card')
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False     
+                        rule_datas.update({'rule_schema': 'bankcard'})                       
+                        _logger.info('End Bank Card Schemas')
+
                 if status:            
                     if 'bank' in rule_datas.values() or  'bankcard' in rule_datas.values() or 'tenanttype' in rule_datas.values():                        
                         if 'bank' in rule_datas.values():
                             _logger.info('Start Bank Schemas')
                             total_amount = 0
-                            rules_bank_ids = rules.bank_ids
+                            rules_bank_ids = rules_detail_id.bank_ids
                             bank_card_list = {}
                             for rules_bank in rules_bank_ids:
                                 rules_bank_id = rules_bank.bank_id.id
@@ -604,48 +741,53 @@ class rdm_trans(osv.osv):
                                 bank_card_list.update({rules_bank_id:rules_bank_name})
                                 
                             trans_detail_ids = trans.trans_detail_ids
+                            
                             for trans_detail in trans_detail_ids:                    
                                 if trans_detail.payment_type == 'creditcard' or trans_detail.payment_type == 'debit':
-                                    bank_id  =  trans_detail.bank_id
+                                    bank_id =  trans_detail.bank_id
                                     if bank_id.id in bank_card_list.keys():
                                         total_amount = total_amount + trans_detail.total_amount
+                                        
                             _logger.info('Total Amount : ' + str(total_amount))                    
                             coupon_spend_amount = schemas_id.coupon_spend_amount
                             point_spend_amount = schemas_id.point_spend_amount
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
                             
-                            if total_amount > coupon_spend_amount or total_amount > point_spend_amount:                    
-                                if rules.apply_for == '1':
-                                    if rules.operation == 'add':
-                                        coupon = rules.quantity                                
-                                    if rules.operation == 'multiple':
-                                        coupon = (total_amount // coupon_spend_amount) + (rules.quantity - 1)                                
+                            if total_amount >= coupon_spend_amount and rules.apply_for == '1' :                                                    
+                                if rules.operation == 'add':
+                                    coupon = rules.quantity                                
+                                if rules.operation == 'multiple':
+                                    coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)                                
+                                _logger.info('Bank  Additional Coupon : ' + str(coupon))
                                                             
-                                if rules.apply_for == '2':
-                                    if rules.operation == 'add':
-                                        point = rules.quantity                                
-                                    if rules.operation == 'multiple':
-                                        point = (total_amount // point_spend_amount) + (rules.quantity - 1)
-                                                    
-                            
-                
+                            if total_amount >= point_spend_amount and rules.apply_for == '2':
+                                if rules.operation == 'add':
+                                    point = rules.quantity                                
+                                if rules.operation == 'multiple':
+                                    point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                _logger.info('Bank  Additional Point: ' + str(coupon))
+                                                                    
                             _logger.info('End Bank Schemas')
                                                         
                         if 'bankcard' in rule_datas.values():
+                            pass
+
+                        if 'tenant' in rule_datas.values():
                             pass
                         
                         if 'tenanttype' in rule_datas.values():
                             _logger.info('Start Tenant Type Schemas')
                             total_amount = 0                
                             trans_detail_ids = trans.trans_detail_ids
+                            
                             for trans_detail in trans_detail_ids:
                                 #Get Tenant Type Information
                                 tenant_id = trans_detail.tenant_id                                    
                                 tenant_category_id = tenant_id.category.id
                                 _logger.info('Tenant Type ID : ' + str(tenant_category_id))
                                 #Get Tenant Type IDS from Schemas
-                                rules_tenant_category_ids = rules.tenant_category_ids                                                    
+                                rules_tenant_category_ids = rules_detail_id.tenant_category_ids                                                    
                                 _logger.info('Length Schemas Tenant Type : ' + str(len(rules_tenant_category_ids)))
                                 for rules_tenant_category in rules_tenant_category_ids:                        
                                     _logger.info('Schemas Tenant Type ID : ' + str(rules_tenant_category.tenant_category_id.id))
@@ -658,31 +800,30 @@ class rdm_trans(osv.osv):
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
                         
-                            if total_amount > coupon_spend_amount or total_amount > point_spend_amount:                    
-                                if rules.apply_for == '1':
-                                    if rules.operation == 'add':
-                                        coupon = rules.quantity                                
-                                    if rules.operation == 'multiple':
-                                        coupon = (total_amount // coupon_spend_amount) + (rules.quantity - 1)                                
-                                                        
-                                if rules.apply_for == '2':
-                                    if rules.operation == 'add':
-                                        point = rules.quantity                                
-                                    if rules.operation == 'multiple':
-                                        point = (total_amount // point_spend_amount) + (rules.quantity - 1)
+                            if total_amount > coupon_spend_amount and rules.apply_for == '1': 
+                                if rules.operation == 'add':
+                                    coupon = rules.quantity                                
+                                if rules.operation == 'multiple':
+                                    coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)                                                                
+                                _logger.info('Tenant Type  Additional Coupon : ' + str(coupon))        
+                            if total_amount > point_spend_amount and rules.apply_for == '2':
+                                if rules.operation == 'add':
+                                    point = rules.quantity                                
+                                if rules.operation == 'multiple':
+                                    point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                _logger.info('Tenant Type  Additional point : ' + str(point))
                                         
-                            if rules_id.schemas == 'ditotal':
-                                if rules.apply_for == '1':
-                                    coupon_ditotal = coupon_ditotal + coupon 
-                                if rules.apply_for == '2':
-                                    point_ditotal = point_ditotal + point
-                            if rules_id.schemas == 'terbesar':
-                                if coupon_terbesar < coupon:
-                                    coupon_terbesar = coupon
-                                if point_terbesar < point:
-                                    point_terbesar = point
-        
-                        
+                            #if rules_id.schemas == 'ditotal':
+                            #    if rules.apply_for == '1':
+                            #        coupon_ditotal = coupon_ditotal + coupon 
+                            #    if rules.apply_for == '2':
+                            #        point_ditotal = point_ditotal + point
+                            #if rules_id.schemas == 'terbesar':
+                            #    if coupon_terbesar < coupon:
+                            #        coupon_terbesar = coupon
+                            #    if point_terbesar < point:
+                            #        point_terbesar = point
+                                                                
                     else:                        
                         if rules.apply_for == '1':
                             if rules.operation == 'add':
@@ -695,6 +836,7 @@ class rdm_trans(osv.osv):
                                 point = point + rules.quantity
                             if rules.operation == 'multiple':
                                 point = trans_schemas_id.point * (rules.quantity - 1)
+
                                                             
                     if rules_id.schemas == 'ditotal': 
                         if rules.apply_for == '1':
@@ -835,6 +977,7 @@ class rdm_trans(osv.osv):
         #Calculate Total Coupon and Point for Transaction
         self._calculate_total_schemas(cr, uid, ids, context)
                                
+    
     def _send_email_notification(self, cr, uid, values, context=None):
         _logger.info('Start Send Email Notification')
         mail_mail = self.pool.get('mail.mail')
@@ -931,6 +1074,11 @@ class rdm_trans_detail(osv.osv):
     _name = "rdm.trans.detail"
     _description = "Redemption Promo Transaction Detail"
     
+    def onchange_bank_id(self, cr, uid, ids, bank_id, context=None):
+        _logger.info('Start Onchange Bank ID')
+        return {'domain':{'bank_card_id':[('bank_id','=', bank_id)]}}        
+        _logger.info('End Onchange Bank ID')
+                    
     _columns = {
         'trans_id': fields.many2one('rdm.trans','Transaction', required=True),
         'tenant_id': fields.many2one('rdm.tenant','Tenant',required=True),
@@ -940,8 +1088,7 @@ class rdm_trans_detail(osv.osv):
         'total_item': fields.integer('Total Item'),
         'payment_type': fields.selection([('cash','Cash'),('creditcard','Credit Card'),('debit','Debit')],'Payment Type',required=True),
         'bank_id': fields.many2one('rdm.bank','Bank'),
-        'bank_card_type': fields.selection([('silver','Silver'),('gold','Gold')],'Bank Card Type'),                
-        'card_provider': fields.selection([('visa','Visa'),('master','Master')],'Card Provider'),        
+        'bank_card_id': fields.many2one('rdm.bank.card','Bank Card'),                                
         'card_number': fields.char('Card Number', size=20),          
         'state':  fields.selection(AVAILABLE_STATES, 'Status', size=16, readonly=True),
         'deleted': fields.boolean('Deleted'),      
@@ -994,3 +1141,25 @@ class rdm_trans_schemas(osv.osv):
     }
     
 rdm_trans_schemas()
+
+class rdm_trans_schemas_coupon(osv.osv):
+    _name = "rdm.trans.schemas.coupon"
+    _description = "Redemtion Transaction Schemas Coupon"
+    _columns = {
+        'trans_schemas_id': fields.many2one('rdm.trans.schemas','Transaction Schemas'),
+        'rules_id': fields.many2one('rdm.rules','Rules'),
+        'coupon': fields.integer('Coupon') 
+    }
+    
+rdm_trans_schemas_coupon()
+
+class rdm_trans_schemas_point(osv.osv):
+    _name = "rdm.trans.schemas.point"
+    _description = "Redemtion Transaction Schemas Point"
+    _columns = {
+        'trans_schemas_id': fields.many2one('rdm.trans.schemas','Transaction Schemas'),
+        'rules_id': fields.many2one('rdm.rules','Rules'),
+        'point': fields.integer('Coupon') 
+    }
+    
+rdm_trans_schemas_point()

@@ -55,7 +55,8 @@
 	                                    <field name="total_amount"/>
 	                                    <field name="total_item"/>
 	                                    <field name="payment_type"/>
-	                                    <field name="bank_id"/>                                    
+	                                    <field name="bank_id"/>
+	                                    <field name="bank_card_id"/>                                    
 	                                    <field name="card_number"/>
 	                                    <field name="tenant_filter" attrs="{'invisible': True}"/>
 	                                    <field name="state"/>
@@ -128,9 +129,8 @@
                         <field name="total_amount"/>
                         <field name="total_item"/>
                         <field name="payment_type"/>
-                        <field name="bank_id" attrs="{'invisible':[('payment_type','==','cash')]}"/>
-                        <field name="bank_card_type" attrs="{'invisible':[('payment_type','==','cash')]}"/>
-                        <field name="card_provider" attrs="{'invisible':[('payment_type','==','cash')]}"/>                      
+                        <field name="bank_id" on_change="onchange_bank_id(bank_id, context)" attrs="{'invisible':[('payment_type','==','cash')]}"/>
+                        <field name="bank_card_id" attrs="{'invisible':[('payment_type','==','cash')]}"/>                                             
                        	<field name="card_number" attrs="{'invisible':[('payment_type','==','cash')]}"/>
                        	
                     </group>                   
@@ -138,6 +138,30 @@
             </field>
         </record>       
         
+		<record model="ir.ui.view" id="view_rdm_trans_schemas_form">
+            <field name="name">rdm.trans.schemas.form</field>
+            <field name="model">rdm.trans.schemas</field>						
+            <field name="type">form</field>						
+            <field name="arch" type="xml">
+                <form string="Transaction Schemas" version="7.0">  
+                    <group colspan="4">                    	
+                        <field name="schemas_id"/>                                               
+                        <field name="valid_amount"/>
+                        <field name="total_item"/>
+                        <field name="total_coupon"/>
+                        <field name="total_point"/>
+                        <field name="coupon"/>
+                        <field name="point"/>
+                        <field name="add_coupon"/>
+                        <field name="add_point"/>
+                        <field name="remark"/>
+                        <field name="state"/>
+                    </group>                   
+                </form>
+            </field>
+        </record>       
+        
+                
 		<record model="ir.ui.view" id="view_rdm_trans_filter">
             <field name="name">Transaction Search</field>
             <field name="model">rdm.trans</field>
