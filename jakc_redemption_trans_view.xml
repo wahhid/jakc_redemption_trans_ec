@@ -60,7 +60,7 @@
 	                            </field>
 	                        </page>              
 	                        <page string="Schemas">
-	                        	<field name="trans_schemas_ids" widget="one2many_list" nolabel="1">
+	                        	<field name="trans_schemas_ids" widget="one2many_list" nolabel="1" readonly="1">
 	                            	<tree string="Schemas">
 	                            	    <field name="schemas_id"/>	                            	    
 	                                	<field name="valid_amount"/>	
@@ -71,7 +71,7 @@
 	                        	</field>
 	                        </page>
 							<page string="Transaction Coupons">
-	                        	<field name="customer_coupon_ids" widget="one2many_list" nolabel="1">
+	                        	<field name="customer_coupon_ids" widget="one2many_list" nolabel="1" readonly="1">
 	                            	<tree string="Coupons">                                                                                                	
 	                                	<field name="trans_type"/>	
 	                                	<field name="coupon"/>	                                	
@@ -81,7 +81,7 @@
 	                        	</field>
 	                    	</page>
 	                    	<page string="Transaction Points">
-	                        	<field name="customer_point_ids" widget="one2many_list" nolabel="1">
+	                        	<field name="customer_point_ids" widget="one2many_list" nolabel="1" readonly="1">
 	                            	<tree string="Points">                                                                                                	
 	                                	<field name="trans_type"/>
 	                                	<field name="point"/>

@@ -904,7 +904,7 @@ class rdm_trans(osv.osv):
                             coupon_ditotal = coupon_ditotal + coupon
                             trans_schemas_coupon_data = {}
                             trans_schemas_coupon_data.update({'trans_schemas_id':trans_schemas_id.id})
-                            trans_schemas_coupon_data.update({'rules_id': rules_id.id})                    
+                            trans_schemas_coupon_data.update({'rules_id': rules.id})                    
                             trans_schemas_coupon_data.update({'coupon': coupon_ditotal})
                             self.pool.get('rdm.trans.schemas.coupon').create(cr, uid, trans_schemas_coupon_data, context=context)
                              
@@ -912,8 +912,8 @@ class rdm_trans(osv.osv):
                             point_ditotal = point_ditotal + point
                             trans_schemas_point_data = {}
                             trans_schemas_point_data.update({'trans_schemas_id':trans_schemas_id.id})
-                            trans_schemas_point_data.update({'rules_id': rules_id.id})                    
-                            trans_schemas_point_data.update({'point': point})
+                            trans_schemas_point_data.update({'rules_id': rules.id})                    
+                            trans_schemas_point_data.update({'point': point_ditotal})
                             self.pool.get('rdm.trans.schemas.point').create(cr, uid, trans_schemas_point_data, context=context)
                                                                     
                     if rules_id.schemas == 'terbesar':
@@ -921,7 +921,7 @@ class rdm_trans(osv.osv):
                             coupon_terbesar = coupon
                             trans_schemas_coupon_data = {}
                             trans_schemas_coupon_data.update({'trans_schemas_id':trans_schemas_id.id})
-                            trans_schemas_coupon_data.update({'rules_id': rules_id.id})                    
+                            trans_schemas_coupon_data.update({'rules_id': rules.id})                    
                             trans_schemas_coupon_data.update({'coupon': coupon_ditotal})
                             self.pool.get('rdm.trans.schemas.coupon').create(cr, uid, trans_schemas_coupon_data, context=context)
                             
@@ -929,8 +929,8 @@ class rdm_trans(osv.osv):
                             point_terbesar = point  
                             trans_schemas_point_data = {}
                             trans_schemas_point_data.update({'trans_schemas_id':trans_schemas_id.id})
-                            trans_schemas_point_data.update({'rules_id': rules_id.id})                    
-                            trans_schemas_point_data.update({'point': point})
+                            trans_schemas_point_data.update({'rules_id': rules.id})                    
+                            trans_schemas_point_data.update({'point': point_ditotal})
                             self.pool.get('rdm.trans.schemas.point').create(cr, uid, trans_schemas_point_data, context=context)
                     
                                         
