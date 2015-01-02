@@ -40,10 +40,6 @@
 							<group string="Coupon and Point">
 		                        <field name="total_coupon" attrs="{'invisible':[('type','=','point')]}"/>       
 		                        <field name="total_point"/>       
-		                        <field name="coupon" attrs="{'invisible':[('type','=','point')]}"/>       
-		                        <field name="point"/>
-		                        <field name="add_coupon" attrs="{'invisible':[('type','=','point')]}"/>                                   
-		                        <field name="add_point"/> 															
 							</group>														
 						</group>	                    
 						<notebook colspan="4">
@@ -156,7 +152,25 @@
                         <field name="add_point"/>
                         <field name="remark"/>
                         <field name="state"/>
-                    </group>                   
+                    </group>                 
+                    <notebook>
+                    	<page string="Additional Coupon">
+                    		<field name="trans_schemas_coupon_ids" widget="one2many_list" nolabel="1">
+	                    		<tree string="Coupons">
+	                    			<field name="rules_id"/>
+	                    			<field name="coupon"/>                    			
+	                    		</tree>	                    	
+                    		</field>
+                    	</page>
+                    	<page string="Additional Point">
+                    		<field name="trans_schemas_point_ids" widget="one2many_list" nolabel="1">
+	                    		<tree string="Point">
+	                    			<field name="rules_id"/>
+	                    			<field name="point"/>                    			
+	                    		</tree>	                    	
+                    		</field>
+                    	</page>
+                    </notebook>  
                 </form>
             </field>
         </record>       
