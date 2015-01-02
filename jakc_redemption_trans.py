@@ -1034,9 +1034,12 @@ class rdm_trans(osv.osv):
     def _define_trans_schemas(self, cr, uid, ids, context=None):
         trans_id  = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
-        active_schemas = self.pool.get('rdm.schemas').active_schemas(cr, uid, trans.type, context)        
-        for schemas in active_schemas:
+        if trans.type == 'promo':            
+            active_schemas = self.pool.get('rdm.schemas').active_promo_schemas(cr, uid, context)
+        if trans.type == 'point':
+            active_schemas = self.pool.get('rdm.schemas').active_point_schemas(cr, uid, context)
             
+        for schemas in active_schemas:            
             trans_schemas_data = {}
             trans_schemas_data.update({'trans_id': ids[0]})
             trans_schemas_data.update({'schemas_id': schemas.id})
