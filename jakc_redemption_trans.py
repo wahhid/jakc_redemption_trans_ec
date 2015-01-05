@@ -51,7 +51,7 @@ class rdm_trans(osv.osv):
         #Post Calculation
         self._post_calculation(cr, uid, ids, context)
         #Final Calulation
-        #self._final_calculation(cr, uid, ids, context)        
+        #self._final_calculation(cr, uid, ids, context)            
         return True
     
     def _update_print_status(self, cr, uid, ids, context=None):
