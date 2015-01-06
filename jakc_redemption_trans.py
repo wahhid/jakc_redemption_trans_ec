@@ -756,14 +756,20 @@ class rdm_trans(osv.osv):
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
-                                    coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)                                
+                                    if rules.quantity >= 1:                                        
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                                
                                 _logger.info('Bank Card Additional Coupon : ' + str(coupon))
                                                             
                             if total_amount >= point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':
-                                    point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    if rules.quantity >= 1:                                        
+                                        point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        point = (total_amount // point_spend_amount) * (rules.quantity)
                                 _logger.info('Bank Card Additional Point: ' + str(coupon))
                                                                     
                             _logger.info('End Bank Card Schemas')
@@ -796,14 +802,20 @@ class rdm_trans(osv.osv):
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
-                                    coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)                                
+                                    if rules.quantity >= 1:                                        
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                             
                                 _logger.info('Bank  Additional Coupon : ' + str(coupon))
                                                             
                             if total_amount >= point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':
-                                    point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    if rules.quantity >= 1:                                        
+                                        point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        point = (total_amount // point_spend_amount) * (rules.quantity)
                                 _logger.info('Bank  Additional Point: ' + str(coupon))
                                                                     
                             _logger.info('End Bank Card Schemas')
@@ -838,13 +850,19 @@ class rdm_trans(osv.osv):
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
-                                    coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)                                                                
+                                    if rules.quantity >= 1:                                        
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                                                              
                                 _logger.info('Tenant  Additional Coupon : ' + str(coupon))        
                             if total_amount > point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
-                                if rules.operation == 'multiple':
-                                    point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                if rules.operation == 'multiple':                                    
+                                    if rules.quantity >= 1:                                        
+                                        point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        point = (total_amount // point_spend_amount) * (rules.quantity)
                                 _logger.info('Tenant Additional point : ' + str(point))
                             
                         
@@ -876,13 +894,19 @@ class rdm_trans(osv.osv):
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
-                                    coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)                                                                
+                                    if rules.quantity >= 1:                                        
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity)
                                 _logger.info('Tenant Type  Additional Coupon : ' + str(coupon))        
                             if total_amount > point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':
-                                    point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    if rules.quantity >= 1:                                        
+                                        point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        point = (total_amount // point_spend_amount) * (rules.quantity)
                                 _logger.info('Tenant Type  Additional point : ' + str(point))
                                                                                                         
                     else:                        
@@ -890,13 +914,19 @@ class rdm_trans(osv.osv):
                             if rules.operation == 'add':
                                 coupon = coupon + rules.quantity
                             if rules.operation == 'multiple':
-                                coupon = trans_schemas_id.coupon * (rules.quantity - 1)  
+                                if rules.quantity >=1:
+                                    coupon = trans_schemas_id.coupon * (rules.quantity - 1)
+                                else:
+                                    coupon = trans_schemas_id.coupon * (rules.quantity)  
                                                                                                                       
                         if rules.apply_for == '2':
                             if rules.operation == 'add':
                                 point = point + rules.quantity
                             if rules.operation == 'multiple':
-                                point = trans_schemas_id.point * (rules.quantity - 1)
+                                if rules.quantity >= 1:
+                                    point = trans_schemas_id.point * (rules.quantity - 1)
+                                else:
+                                    point = trans_schemas_id.point * (rules.quantity)
                                 
                     #Calculate  Coupon and Point Per Rules                                   
                     if rules_id.schemas == 'ditotal': 
