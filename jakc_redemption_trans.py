@@ -616,8 +616,8 @@ class rdm_trans(osv.osv):
                                 status = status or False
                             if operation == 'and':
                                 status = status and False
-                        rule_datas.update({'rule_schema': 'cardtype'})
-                                                                                                
+                        rule_datas.update({'rule_schema': 'cardtype'})                                        
+                                                                                                                        
                     #Age
                     if rule_schema == 'age':
                         _logger.info('Start Age Schemas')
@@ -642,7 +642,7 @@ class rdm_trans(osv.osv):
                             if age_id.operator == 'bw':
                                 if customer_age >= age_id.value1 and customer_age <= age_id.value2:
                                     age_rules = True
-                        
+                                                            
                         if age_rules == True:
                             _logger.info('Match Age')
                             if operation == 'or':
@@ -658,10 +658,61 @@ class rdm_trans(osv.osv):
                         rule_datas.update({'rule_schema': 'age'})
                         _logger.info('End Age Schemas')
                      
+                    #Participant
+                    if rule_schema == 'participant':
+                        participant_ids  = rules_detail_id.participant_ids
+                        participant_list = {}
+                        for participant_id in participant_ids:
+                            participant = participant_id.participant_id
+                            participant_list.update({participant:participant})
+                        
+                        participant_rules = False
+                        total_amount = 0
+                        trans_detail_ids = trans.trans_detail_ids
+                        for trans_detail_id in trans_detail_ids:
+                            tenant  = trans_detail_id.tenant_id
+                            if tenant.participant in participant_list.keys():
+                                participant_rules = True
+                                total_amount = total_amount + trans_detail_id.total_amount
+                                                        
+                        if participant_rules == True:
+                            _logger.info('Match Participant')
+                            if operation == 'or':
+                                status = status or True
+                            if operation == 'and':
+                                status = status and True                                                        
+                        else: 
+                            if operation == 'or':
+                                status = status or False
+                            if operation == 'and':
+                                status = status and False                                                        
+                        
+                        rule_datas.update({'rule_schema': 'participant'})
+                        
                     #Tenant Type     
                     if rule_schema == 'tenanttype':
-                        _logger.info('Start Tenant Type Schemas')                                                
-                        if True:                        
+                        _logger.info('Start Tenant Type Schemas')   
+                        total_amount = 0                
+                        trans_detail_ids = trans.trans_detail_ids
+                        rules_tenant_category_ids = rules_detail_id.tenant_category_ids
+                        
+                        tenant_category_list = {}                            
+                        for rules_tenant_category_id in rules_tenant_category_ids:
+                            tenant_category = rules_tenant_category_id.tenant_category_id
+                            tenant_category_list.update({tenant_category.id:tenant_category.name})
+                            
+                        tenanttype_rules = False
+                        for trans_detail in trans_detail_ids:
+                            #Get Tenant Type Information
+                            tenant_id = trans_detail.tenant_id                                    
+                            tenant_category_id = tenant_id.category
+                            _logger.info('Tenant Type ID : ' + str(tenant_category_id.id))
+                            #Get Tenant Type IDS from Schemas
+                            if tenant_category_id.id in tenant_category_list.keys():
+                                tenanttype_rules = True
+                                total_amount = total_amount + trans_detail.total_amount   
+                                                                                                    
+                        if tenanttype_rules:                        
                             _logger.info('Match Tenant Type')
                             if operation == 'or':
                                 status = status or True
@@ -677,8 +728,25 @@ class rdm_trans(osv.osv):
 
                     #Tenant     
                     if rule_schema == 'tenant':
-                        _logger.info('Start Tenant Schemas')                                                                    
-                        if True:                        
+                        _logger.info('Start Tenant Schemas')             
+                        
+                        total_amount = 0          
+                        rules_tenant_ids = rules_detail_id.tenant_ids 
+                        tenant_list = {}
+                        for rules_tenant_id in rules_tenant_ids:
+                            tenant_id = rules_tenant_id.tenant_id                            
+                            tenant_list.update({tenant_id.id:tenant_id.name})
+                                                            
+                        trans_detail_ids = trans.trans_detail_ids
+                        tenant_rules = False
+                        for trans_detail in trans_detail_ids:
+                            #Get Tenant Type Information
+                            tenant_id = trans_detail.tenant_id                                                                                                
+                            if tenant_id.id in tenant_list.keys():
+                                tenant_rules = True
+                                total_amount = total_amount + trans_detail.total_amount    
+                                                                                                                   
+                        if tenant_rules:                        
                             _logger.info('Match Tenant')
                             if operation == 'or':
                                 status = status or True
@@ -689,13 +757,29 @@ class rdm_trans(osv.osv):
                                 status = status or False
                             if operation == 'and':
                                 status = status and False     
-                        rule_datas.update({'rule_schema': 'tenant'})                       
+                        rule_datas.update({'rule_schema': 'tenant'})        
+                                       
                         _logger.info('End Tenant Schemas')
-
+                        
                     #Bank     
                     if rule_schema == 'bank':
-                        _logger.info('Start Bank Schemas')                                                
-                        if True:                        
+                        _logger.info('Start Bank Schemas')         
+                        total_amount = 0
+                        rules_bank_ids = rules_detail_id.bank_ids
+                        bank_card_list = {}
+                        for rules_bank in rules_bank_ids:
+                            bank_id  = rules_bank.bank_id
+                            bank_card_list.update({bank_id.id:bank_id.name})
+                                
+                        trans_detail_ids = trans.trans_detail_ids
+                        bank_rules = False
+                        for trans_detail in trans_detail_ids:                    
+                            if trans_detail.payment_type == 'creditcard' or trans_detail.payment_type == 'debit':
+                                bank_id =  trans_detail.bank_id
+                                if bank_id.id in bank_card_list.keys():
+                                    bank_rules = True
+                                    total_amount = total_amount + trans_detail.total_amount                                                                        
+                        if bank_rules:                        
                             _logger.info('Match Bank')
                             if operation == 'or':
                                 status = status or True
@@ -705,14 +789,30 @@ class rdm_trans(osv.osv):
                             if operation == 'or':
                                 status = status or False
                             if operation == 'and':
-                                status = status and False     
+                                status = status and False  
+                                   
                         rule_datas.update({'rule_schema': 'bank'})                       
-                        _logger.info('End Bank Schemas')
                     
                     #Bank Card     
                     if rule_schema == 'bankcard':
-                        _logger.info('Start Bank Card Schemas')                                                
-                        if True:                        
+                        _logger.info('Start Bank Card Schemas')    
+                        total_amount = 0
+                        rules_bank_card_ids = rules_detail_id.bank_card_ids
+                        bank_card_list = {}
+                        for rules_bank_card in rules_bank_card_ids:
+                            bank_card_id = rules_bank_card.bank_card_id
+                            bank_card_list.update({bank_card_id.id:bank_card_id.name})
+                                
+                        trans_detail_ids = trans.trans_detail_ids
+                        bank_card_rules = False
+                        for trans_detail in trans_detail_ids:                    
+                            if trans_detail.payment_type == 'creditcard' or trans_detail.payment_type == 'debit':
+                                bank_card_id =  trans_detail.bank_card_id
+                                if bank_card_id.id in bank_card_list.keys():
+                                    bank_card_rules = True
+                                    total_amount = total_amount + trans_detail.total_amount
+                                    
+                        if bank_card_rules:                        
                             _logger.info('Match Bank Card')
                             if operation == 'or':
                                 status = status or True
@@ -723,35 +823,18 @@ class rdm_trans(osv.osv):
                                 status = status or False
                             if operation == 'and':
                                 status = status and False     
+                                
                         rule_datas.update({'rule_schema': 'bankcard'})                       
-                        _logger.info('End Bank Card Schemas')
+                        
 
                 if status:            
-                    if 'bank' in rule_datas.values() or  'bankcard' in rule_datas.values() or 'tenanttype' in rule_datas.values():                        
-                        if 'bankcard' in rule_datas.values():
-                            _logger.info('Start Bank Card Schemas')
-                            total_amount = 0
-                            rules_bank_card_ids = rules_detail_id.bank_card_ids
-                            bank_card_list = {}
-                            for rules_bank_card in rules_bank_card_ids:
-                                rules_bank_card_id = rules_bank_card.bank_id.id
-                                rules_bank_card_name = rules_bank_card.bank_id.name
-                                bank_card_list.update({rules_bank_card_id:rules_bank_card_name})
-                                
-                            trans_detail_ids = trans.trans_detail_ids
-                            
-                            for trans_detail in trans_detail_ids:                    
-                                if trans_detail.payment_type == 'creditcard' or trans_detail.payment_type == 'debit':
-                                    bank_card_id =  trans_detail.bank_card_id
-                                    if bank_card_id.id in bank_card_list.keys():
-                                        total_amount = total_amount + trans_detail.total_amount
-                                        
+                    if 'bank' in rule_datas.values() or  'bankcard' in rule_datas.values() or 'tenanttype' in rule_datas.values() or 'participant' in rule_datas.values():                        
+                        if 'bankcard' in rule_datas.values():                                    
                             _logger.info('Total Amount : ' + str(total_amount))                    
                             coupon_spend_amount = schemas_id.coupon_spend_amount
                             point_spend_amount = schemas_id.point_spend_amount
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
-                            _logger.info('Point Spend Amount : ' + str(point_spend_amount))
-                            
+                            _logger.info('Point Spend Amount : ' + str(point_spend_amount))                                                
                             if total_amount >= coupon_spend_amount and rules.apply_for == '1' :                                                    
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
@@ -760,8 +843,9 @@ class rdm_trans(osv.osv):
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)
                                     else:
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                                
+                                
                                 _logger.info('Bank Card Additional Coupon : ' + str(coupon))
-                                                            
+                                                                
                             if total_amount >= point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
@@ -770,33 +854,17 @@ class rdm_trans(osv.osv):
                                         point = (total_amount // point_spend_amount) * (rules.quantity - 1)
                                     else:
                                         point = (total_amount // point_spend_amount) * (rules.quantity)
-                                _logger.info('Bank Card Additional Point: ' + str(coupon))
-                                                                    
+                                _logger.info('Bank Card Additional Point: ' + str(point))   
+                                                                                                 
                             _logger.info('End Bank Card Schemas')
                                                         
-                        if 'bank' in rule_datas.values():
-                            _logger.info('Start Bank Card Schemas')
-                            total_amount = 0
-                            rules_bank_ids = rules_detail_id.bank_ids
-                            bank_card_list = {}
-                            for rules_bank in rules_bank_ids:
-                                rules_bank_id = rules_bank.bank_id.id
-                                rules_bank_name = rules_bank.bank_id.name
-                                bank_card_list.update({rules_bank_id:rules_bank_name})
-                                
-                            trans_detail_ids = trans.trans_detail_ids
-                            
-                            for trans_detail in trans_detail_ids:                    
-                                if trans_detail.payment_type == 'creditcard' or trans_detail.payment_type == 'debit':
-                                    bank_id =  trans_detail.bank_id
-                                    if bank_id.id in bank_card_list.keys():
-                                        total_amount = total_amount + trans_detail.total_amount
-                                        
+                        if 'bank' in rule_datas.values():                                    
                             _logger.info('Total Amount : ' + str(total_amount))                    
                             coupon_spend_amount = schemas_id.coupon_spend_amount
                             point_spend_amount = schemas_id.point_spend_amount
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
+                            
                             
                             if total_amount >= coupon_spend_amount and rules.apply_for == '1' :                                                    
                                 if rules.operation == 'add':
@@ -807,7 +875,7 @@ class rdm_trans(osv.osv):
                                     else:
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                             
                                 _logger.info('Bank  Additional Coupon : ' + str(coupon))
-                                                            
+                                                                
                             if total_amount >= point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
@@ -816,36 +884,20 @@ class rdm_trans(osv.osv):
                                         point = (total_amount // point_spend_amount) * (rules.quantity - 1)
                                     else:
                                         point = (total_amount // point_spend_amount) * (rules.quantity)
-                                _logger.info('Bank  Additional Point: ' + str(coupon))
+                                _logger.info('Bank  Additional Point: ' + str(point))
                                                                     
-                            _logger.info('End Bank Card Schemas')
+                            _logger.info('End Bank Schemas')
 
 
                         if 'tenant' in rule_datas.values():
                             _logger.info('Start Tenant Schemas')
-                            total_amount = 0          
-                            rules_tenant_ids = rules_detail_id.tenant_ids 
-                            tenant_list = {}
-                            for rules_tenant_id in rules_tenant_ids:
-                                tenant_id = rules_tenant_id.id
-                                tenant_name = rules_tenant_id.name
-                                tenant_list.update({tenant_id:tenant_name})
-                                                            
-                            trans_detail_ids = trans.trans_detail_ids
-                            
-                            for trans_detail in trans_detail_ids:
-                                #Get Tenant Type Information
-                                tenant_id = trans_detail.tenant_id                                                                    
-                                _logger.info('Tenant ID : ' + str(tenant_id.id))
-                                if tenant_id in tenant_list.keys():
-                                    total_amount = total_amount + trans_detail.total_amount
-
                             _logger.info('Total Amount : ' + str(total_amount))
                             coupon_spend_amount = schemas_id.coupon_spend_amount
                             point_spend_amount = schemas_id.point_spend_amount
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
-                        
+                            
+                            
                             if total_amount > coupon_spend_amount and rules.apply_for == '1': 
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
@@ -866,30 +918,44 @@ class rdm_trans(osv.osv):
                                 _logger.info('Tenant Additional point : ' + str(point))
                             
                         
+                        if 'participant' in rule_datas.values():
+                            _logger.info('Start Participant Schemas')
+                            _logger.info('Total Amount : ' + str(total_amount))                    
+                            coupon_spend_amount = schemas_id.coupon_spend_amount
+                            point_spend_amount = schemas_id.point_spend_amount
+                            _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
+                            _logger.info('Point Spend Amount : ' + str(point_spend_amount))                            
+                            if total_amount > coupon_spend_amount and rules.apply_for == '1': 
+                                if rules.operation == 'add':
+                                    coupon = rules.quantity                                
+                                if rules.operation == 'multiple':
+                                    if rules.quantity >= 1:                                        
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                                                              
+                                _logger.info('Tenant  Additional Coupon : ' + str(coupon))        
+                            if total_amount > point_spend_amount and rules.apply_for == '2':
+                                if rules.operation == 'add':
+                                    point = rules.quantity                                
+                                if rules.operation == 'multiple':                                    
+                                    if rules.quantity >= 1:                                        
+                                        point = (total_amount // point_spend_amount) * (rules.quantity - 1)
+                                    else:
+                                        point = (total_amount // point_spend_amount) * (rules.quantity)
+                                _logger.info('Tenant Additional point : ' + str(point))
+                                                                                
+                                                                                
                         if 'tenanttype' in rule_datas.values():
                             _logger.info('Start Tenant Type Schemas')
-                            total_amount = 0                
-                            trans_detail_ids = trans.trans_detail_ids
-                            
-                            for trans_detail in trans_detail_ids:
-                                #Get Tenant Type Information
-                                tenant_id = trans_detail.tenant_id                                    
-                                tenant_category_id = tenant_id.category.id
-                                _logger.info('Tenant Type ID : ' + str(tenant_category_id))
-                                #Get Tenant Type IDS from Schemas
-                                rules_tenant_category_ids = rules_detail_id.tenant_category_ids                                                    
-                                _logger.info('Length Schemas Tenant Type : ' + str(len(rules_tenant_category_ids)))
-                                for rules_tenant_category in rules_tenant_category_ids:                        
-                                    _logger.info('Schemas Tenant Type ID : ' + str(rules_tenant_category.tenant_category_id.id))
-                                    if rules_tenant_category.tenant_category_id.id == tenant_category_id:
-                                        total_amount = total_amount + trans_detail.total_amount
-                            
+                           
+                                                                                                      
                             _logger.info('Total Amount : ' + str(total_amount))
                             coupon_spend_amount = schemas_id.coupon_spend_amount
                             point_spend_amount = schemas_id.point_spend_amount
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
                         
+                            
                             if total_amount > coupon_spend_amount and rules.apply_for == '1': 
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
@@ -899,6 +965,7 @@ class rdm_trans(osv.osv):
                                     else:
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity)
                                 _logger.info('Tenant Type  Additional Coupon : ' + str(coupon))        
+                                    
                             if total_amount > point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
