@@ -2,6 +2,7 @@ from openerp.osv import fields, osv
 import datetime
 
 import logging
+from __builtin__ import True
 _logger = logging.getLogger(__name__)
 
 AVAILABLE_STATES = [
@@ -342,34 +343,74 @@ class rdm_trans(osv.osv):
         if status == True:
             datas.update({'trans_filter':True})                                    
         
-        datas.update({'remark': message})
-        
-        #super(rdm_trans,self).write(cr, uid, [trans_id], datas, context=context)
-        self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id], datas, context=context)
-                    
+        datas.update({'remark': message})            
+        self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id], datas, context=context)                    
         return None    
     
-    def _get_tenant_filters(self, cr, uid, schemas_id, tenant_id, context=None):
+    def _get_tenant_filters(self, cr, uid, schemas_id, tenant, context=None):
         _logger.info('Start Tenant Filter')
-        status = False
-        message = "Error tenant " + str(tenant_id.id) + " filter"
+        tenant_status = True
+        tenant_category_status = True
+        ayc_participant_status = True
+        
+        message = "Error tenant " + str(tenant.id) + " filter"
         
         schemas_tenant_ids = schemas_id.tenant_ids
-        if schemas_tenant_ids:
-            for schemas_tenant_id in schemas_tenant_ids:
-                if schemas_tenant_id.tenant_id.id == tenant_id.id:
-                    status = True
-        else:
-            status = True
             
-        schemas_tenant_category_ids = schemas_id.tenant_category_ids
-        if schemas_tenant_category_ids:
-            for schemas_tenant_category_id in schemas_tenant_category_ids:
-                if schemas_tenant_category_id.tenant_category_id.id == tenant_id.category.id:
-                    status = True
+        tenant_list = {}
+        for schemas_tenant_id in schemas_tenant_ids:
+            tenant_id = schemas_tenant_id.tenant_id
+            tenant_list.update({tenant_id.id:tenant_id.name})
+                        
+        schemas_tenant_category_ids = schemas_id.tenant_category_ids        
+        tenant_category_list = {}
+        for schemas_tenant_category_id in schemas_tenant_category_ids:
+            tenant_category_id = schemas_tenant_category_id.tenant_category_id
+            tenant_category_list.update({tenant_category_id.id:tenant_category_id.name})
+            
+        schemas_ayc_participant_ids = schemas_id.ayc_participant_ids
+        ayc_participant_list = {}
+        
+        for schemas_ayc_participant_id in schemas_ayc_participant_ids:
+            ayc_participant_id = schemas_ayc_participant_id.participant_id
+            ayc_participant_list.update({ayc_participant_id:ayc_participant_id}) 
+        
+        
+        if tenant_list:
+            if tenant.id in tenant_list.keys():
+                tenant_status = True
+            else:
+                tenant_status = False           
+        elif tenant_category_list:
+            if tenant.category.id in tenant_category_list.keys():                
+                tenant_category_status = True
+            else:
+                tenant_category_status = False
+        elif ayc_participant_list:
+            if tenant.participant in ayc_participant_list.keys():
+                ayc_participant_status = True
+            else:
+                ayc_participant_status = False
+         
+        status = tenant_status and tenant_category_status and ayc_participant_status
+                                                           
+        message = ''
+        
+        if tenant_status:
+            message = message + "Tenant Status True|"
         else:
-            status = True                
-                                                
+            message = message + "Tenant Status False|"
+
+        if tenant_category_status:
+            message = message + "Tenant Category Status True|"
+        else:
+            message = message + "Tenant Category Status False|"
+            
+        if ayc_participant_status:
+            message = message + "Ayc Participant Status True|"
+        else:
+            message = message + "Ayc Participant Status False|"
+
         _logger.info('End Tenant Filter')                            
         return status, message    
     
@@ -407,27 +448,25 @@ class rdm_trans(osv.osv):
         _logger.info('Start Get Valid Total Filter')        
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
-        trans_schemas = self._get_trans_schemas(cr, uid, [trans_schemas_id], context=context)
-        schemas_id = trans_schemas.schemas_id
-        valid_amount = 0                            
-        for trans_detail in trans.trans_detail_ids:
-            tenant_id = trans_detail.tenant_id
-            status, message = self._get_tenant_filters(cr, uid, schemas_id, tenant_id, context=context)
-            if status:        
-                valid_amount = valid_amount + trans_detail.total_amount
+        trans_schemas_ids = trans.trans_schemas_ids
+        for trans_schemas_id in trans_schemas_ids:            
+            schemas_id = trans_schemas_id.schemas_id
+            valid_amount = 0                            
+            for trans_detail in trans.trans_detail_ids:
+                tenant_id = trans_detail.tenant_id
+                status, message = self._get_tenant_filters(cr, uid, schemas_id, tenant_id, context=context)
+                _logger.info(message)
+                if status:        
+                    valid_amount = valid_amount + trans_detail.total_amount
+                
+            trans_schemas_data = {}
+            if trans_schemas_id.trans_filter == True:
+                trans_schemas_data.update({'valid_amount':valid_amount})
             else:
-                detail_data = {}
-                detail_data.update({'tenant_filter':True})
-                self.pool.get('rdm.trans.detail').write(cr, uid, [trans_detail.id], detail_data, context=context)             
-            
-        trans_schemas_data = {}
-        if trans_schemas.trans_filter == True:
-            trans_schemas_data.update({'valid_amount':valid_amount})
-        else:
-            trans_schemas_data.update({'valid_amount':0})        
-        #super(rdm_trans,self).write(cr, uid, [trans_id], trans_data, context=context)
-        self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id], trans_schemas_data, context=context)
-        _logger.info('End Get Valid Total Filter')
+                trans_schemas_data.update({'valid_amount':valid_amount})        
+                            
+            self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id.id], trans_schemas_data, context=context)
+            _logger.info('End Get Valid Total Filter')
         
     
     def _calculate_coupon_and_point(self,cr, uid, trans_id, context=None):
@@ -440,16 +479,25 @@ class rdm_trans(osv.osv):
             schemas_id = trans_schemas_id.schemas_id
             valid_amount = trans_schemas_id.valid_amount
                              
-            if trans.type == 'promo':                        
-                coupon = (valid_amount // schemas_id.coupon_spend_amount)
+            if trans.type == 'promo':       
+                if schemas_id.coupon_spend_amount != 0:               
+                    coupon = (valid_amount // schemas_id.coupon_spend_amount)
+                else:
+                    coupon = 0
                 
             if schemas_id.limit_point == -1:
-                point = (valid_amount // schemas_id.point_spend_amount)
+                if schemas_id.point_spend_amount != 0:
+                    point = (valid_amount // schemas_id.point_spend_amount)
+                else:
+                    point = 0
             else:
-                point = (valid_amount // schemas_id.point_spend_amount)
-                if point > schemas_id.limit_point:
-                    point = schemas_id.limit_point
-                                
+                if schemas_id.point_spend_amount != 0:
+                    point = (valid_amount // schemas_id.point_spend_amount)
+                    if point > schemas_id.limit_point:
+                        point = schemas_id.limit_point
+                else:
+                    point = 0
+                    
             trans_schemas_data = {}
             trans_schemas_data.update({'coupon':coupon})
             trans_schemas_data.update({'point':point})
@@ -835,7 +883,7 @@ class rdm_trans(osv.osv):
                             point_spend_amount = schemas_id.point_spend_amount
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))                                                
-                            if total_amount >= coupon_spend_amount and rules.apply_for == '1' :                                                    
+                            if coupon_spend_amount != 0 and total_amount >= coupon_spend_amount and rules.apply_for == '1' :                                                    
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -846,7 +894,7 @@ class rdm_trans(osv.osv):
                                 
                                 _logger.info('Bank Card Additional Coupon : ' + str(coupon))
                                                                 
-                            if total_amount >= point_spend_amount and rules.apply_for == '2':
+                            if point_spend_amount != 0 and total_amount >= point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -866,7 +914,7 @@ class rdm_trans(osv.osv):
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
                             
                             
-                            if total_amount >= coupon_spend_amount and rules.apply_for == '1' :                                                    
+                            if coupon_spend_amount != 0 and total_amount >= coupon_spend_amount and rules.apply_for == '1' :                                                    
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -876,7 +924,7 @@ class rdm_trans(osv.osv):
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                             
                                 _logger.info('Bank  Additional Coupon : ' + str(coupon))
                                                                 
-                            if total_amount >= point_spend_amount and rules.apply_for == '2':
+                            if point_spend_amount != 0 and total_amount >= point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -898,7 +946,7 @@ class rdm_trans(osv.osv):
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
                             
                             
-                            if total_amount > coupon_spend_amount and rules.apply_for == '1': 
+                            if coupon_spend_amount != 0 and  total_amount > coupon_spend_amount and rules.apply_for == '1': 
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -907,7 +955,7 @@ class rdm_trans(osv.osv):
                                     else:
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                                                              
                                 _logger.info('Tenant  Additional Coupon : ' + str(coupon))        
-                            if total_amount > point_spend_amount and rules.apply_for == '2':
+                            if point_spend_amount != 0 and total_amount > point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':                                    
@@ -925,7 +973,7 @@ class rdm_trans(osv.osv):
                             point_spend_amount = schemas_id.point_spend_amount
                             _logger.info('Coupon Spend Amount : ' + str(coupon_spend_amount))
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))                            
-                            if total_amount > coupon_spend_amount and rules.apply_for == '1': 
+                            if coupon_spend_amount != 0 and total_amount > coupon_spend_amount and rules.apply_for == '1': 
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -934,7 +982,7 @@ class rdm_trans(osv.osv):
                                     else:
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity)                                                              
                                 _logger.info('Tenant  Additional Coupon : ' + str(coupon))        
-                            if total_amount > point_spend_amount and rules.apply_for == '2':
+                            if point_spend_amount != 0 and total_amount > point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':                                    
@@ -956,7 +1004,7 @@ class rdm_trans(osv.osv):
                             _logger.info('Point Spend Amount : ' + str(point_spend_amount))
                         
                             
-                            if total_amount > coupon_spend_amount and rules.apply_for == '1': 
+                            if coupon_spend_amount != 0 and total_amount > coupon_spend_amount and rules.apply_for == '1': 
                                 if rules.operation == 'add':
                                     coupon = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -966,7 +1014,7 @@ class rdm_trans(osv.osv):
                                         coupon = (total_amount // coupon_spend_amount) * (rules.quantity)
                                 _logger.info('Tenant Type  Additional Coupon : ' + str(coupon))        
                                     
-                            if total_amount > point_spend_amount and rules.apply_for == '2':
+                            if point_spend_amount != 0 and total_amount > point_spend_amount and rules.apply_for == '2':
                                 if rules.operation == 'add':
                                     point = rules.quantity                                
                                 if rules.operation == 'multiple':
@@ -1002,7 +1050,7 @@ class rdm_trans(osv.osv):
                             trans_schemas_coupon_data = {}
                             trans_schemas_coupon_data.update({'trans_schemas_id':trans_schemas_id.id})
                             trans_schemas_coupon_data.update({'rules_id': rules.id})                    
-                            trans_schemas_coupon_data.update({'coupon': coupon_ditotal})
+                            trans_schemas_coupon_data.update({'coupon': coupon})
                             self.pool.get('rdm.trans.schemas.coupon').create(cr, uid, trans_schemas_coupon_data, context=context)
                              
                         if rules.apply_for == '2':
@@ -1010,25 +1058,27 @@ class rdm_trans(osv.osv):
                             trans_schemas_point_data = {}
                             trans_schemas_point_data.update({'trans_schemas_id':trans_schemas_id.id})
                             trans_schemas_point_data.update({'rules_id': rules.id})                    
-                            trans_schemas_point_data.update({'point': point_ditotal})
+                            trans_schemas_point_data.update({'point': point})
                             self.pool.get('rdm.trans.schemas.point').create(cr, uid, trans_schemas_point_data, context=context)
                                                                     
                     if rules_id.schemas == 'terbesar':
-                        if coupon_terbesar < coupon:
-                            coupon_terbesar = coupon
-                            trans_schemas_coupon_data = {}
-                            trans_schemas_coupon_data.update({'trans_schemas_id':trans_schemas_id.id})
-                            trans_schemas_coupon_data.update({'rules_id': rules.id})                    
-                            trans_schemas_coupon_data.update({'coupon': coupon_ditotal})
-                            self.pool.get('rdm.trans.schemas.coupon').create(cr, uid, trans_schemas_coupon_data, context=context)
+                        if rules.apply_for == '1':
+                            if coupon_terbesar < coupon:
+                                coupon_terbesar = coupon
+                                trans_schemas_coupon_data = {}
+                                trans_schemas_coupon_data.update({'trans_schemas_id':trans_schemas_id.id})
+                                trans_schemas_coupon_data.update({'rules_id': rules.id})                    
+                                trans_schemas_coupon_data.update({'coupon': coupon})
+                                self.pool.get('rdm.trans.schemas.coupon').create(cr, uid, trans_schemas_coupon_data, context=context)
                             
-                        if point_terbesar < point:
-                            point_terbesar = point  
-                            trans_schemas_point_data = {}
-                            trans_schemas_point_data.update({'trans_schemas_id':trans_schemas_id.id})
-                            trans_schemas_point_data.update({'rules_id': rules.id})                    
-                            trans_schemas_point_data.update({'point': point_ditotal})
-                            self.pool.get('rdm.trans.schemas.point').create(cr, uid, trans_schemas_point_data, context=context)
+                        if rules.apply_for == '2':
+                            if point_terbesar < point:
+                                point_terbesar = point  
+                                trans_schemas_point_data = {}
+                                trans_schemas_point_data.update({'trans_schemas_id':trans_schemas_id.id})
+                                trans_schemas_point_data.update({'rules_id': rules.id})                    
+                                trans_schemas_point_data.update({'point': point})
+                                self.pool.get('rdm.trans.schemas.point').create(cr, uid, trans_schemas_point_data, context=context)
                     
                                         
                 coupon =  coupon_ditotal + coupon_terbesar
@@ -1047,8 +1097,10 @@ class rdm_trans(osv.osv):
         trans = self._get_trans(cr, uid, trans_id, context)
         trans_schemas_ids = trans.trans_schemas_ids
         for trans_schemas_id in trans_schemas_ids:            
-            total_coupon = trans_schemas_id.coupon + trans_schemas_id.add_coupon
-            total_point = trans_schemas_id.point + trans_schemas_id.add_point                    
+            #total_coupon = trans_schemas_id.coupon + trans_schemas_id.add_coupon
+            #total_point = trans_schemas_id.point + trans_schemas_id.add_point
+            total_coupon = trans_schemas_id.add_coupon
+            total_point = trans_schemas_id.add_point                                        
             trans_schemas_data = {}
             trans_schemas_data.update({'total_coupon':total_coupon})
             trans_schemas_data.update({'total_point':total_point})            
