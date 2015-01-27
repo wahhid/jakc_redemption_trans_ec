@@ -62,8 +62,7 @@
 	                        <page string="Schemas">
 	                        	<field name="trans_schemas_ids" widget="one2many_list" nolabel="1" readonly="1">
 	                            	<tree string="Schemas">
-	                            	    <field name="schemas_id"/>	                            	    
-	                                	<field name="valid_amount"/>	
+	                            	    <field name="schemas_id"/>	                            	    	                                	
 	                                	<field name="total_coupon"/>	                                	
 	                                	<field name="total_point"/>	                                	
 	                                	<field name="state"/>                                                                                                                                                                                                                                      
@@ -106,7 +105,7 @@
                     <field name="customer_id"/>                        
                     <field name="trans_date"/>                    
                     <field name="total_amount"/>                     
-                    <field name="total_item"/>
+                    <field name="total_item"/>                    
  					<field name="state"/>                   
                 </tree>
             </field>
@@ -125,11 +124,34 @@
                         <field name="total_amount"/>
                         <field name="total_item"/>
                         <field name="payment_type"/>
-                        <field name="bank_id" on_change="onchange_bank_id(bank_id, context)" attrs="{'invisible':[('payment_type','==','cash')]}"/>
+                        <field name="bank_id" on_change="onchange_bank_id(bank_id, context)" attrs="{'invisible':[('payment_type','==','cash')]}"/>                        
                         <field name="bank_card_id" attrs="{'invisible':[('payment_type','==','cash')]}"/>                                             
                        	<field name="card_number" attrs="{'invisible':[('payment_type','==','cash')]}"/>
-                       	
                     </group>                   
+                    <notebook>
+                    	<page string="Detail Coupons">
+	                    	<field name="trans_detail_coupon_ids" widget="one2many_list" nolabel="1" readonly="1">
+	                       		<tree string="Coupons">                                                                                                	
+	                                <field name="trans_schemas_id"/>
+	                                <field name="coupon"/>
+	                                <field name="multiple_ditotal"/>
+	                                <field name="add_ditotal"/>	                                
+	                                
+	                            </tree>                    
+	                        </field>                    
+                    	</page>
+                    	<page string="Detail Points">
+	                    	<field name="trans_detail_point_ids" widget="one2many_list" nolabel="1" readonly="1">
+	                       		<tree string="Points">                                                                                                	
+	                                <field name="trans_schemas_id"/>
+	                                <field name="point"/>
+	                                <field name="multiple_ditotal"/>
+	                                <field name="add_ditotal"/>
+	                                	                               
+	                            </tree>                    
+	                        </field>                                        	
+                    	</page>
+                    </notebook>
                 </form>
             </field>
         </record>       
@@ -141,37 +163,13 @@
             <field name="arch" type="xml">
                 <form string="Transaction Schemas" version="7.0">  
                     <group colspan="4">                    	
-                        <field name="schemas_id"/>                                               
-                        <field name="valid_amount"/>
-                        <field name="total_item"/>
+                        <field name="schemas_id"/>                                                                                  
                         <field name="total_coupon"/>
                         <field name="total_point"/>
-                        <field name="coupon"/>
-                        <field name="point"/>
-                        <field name="add_coupon"/>
-                        <field name="add_point"/>
                         <field name="remark"/>
                         <field name="state"/>
                     </group>                 
-                    <notebook>
-                    	<page string="Additional Coupon">
-                    		<field name="trans_schemas_coupon_ids" widget="one2many_list" nolabel="1">
-	                    		<tree string="Coupons">
-	                    			<field name="rules_id"/>
-	                    			<field name="coupon"/>                    			
-	                    		</tree>	                    	
-                    		</field>
-                    	</page>
-                    	<page string="Additional Point">
-                    		<field name="trans_schemas_point_ids" widget="one2many_list" nolabel="1">
-	                    		<tree string="Point">
-	                    			<field name="rules_id"/>
-	                    			<field name="point"/>                    			
-	                    		</tree>	                    	
-                    		</field>
-                    	</page>
-                    </notebook>  
-                </form>
+              	</form>
             </field>
         </record>       
         
