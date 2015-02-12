@@ -1,4 +1,4 @@
-<openerp>
+	<openerp>
     <data>
         <!-- RDM/TRANSACTION-->		
         <record model="ir.ui.view" id="view_rdm_trans_form">
@@ -132,22 +132,30 @@
                     	<page string="Detail Coupons">
 	                    	<field name="trans_detail_coupon_ids" widget="one2many_list" nolabel="1" readonly="1">
 	                       		<tree string="Coupons">                                                                                                	
-	                                <field name="trans_schemas_id"/>
+	                                <field name="trans_schemas_id">
+	                                	<field name="name_related"/>
+	                                </field>	                                
 	                                <field name="coupon"/>
+	                                <field name="basic"/>
 	                                <field name="multiple_ditotal"/>
+	                                <field name="multiple_terbesar"/>
 	                                <field name="add_ditotal"/>	                                
-	                                
+	                                <field name="add_terbesar"/>
 	                            </tree>                    
 	                        </field>                    
                     	</page>
                     	<page string="Detail Points">
 	                    	<field name="trans_detail_point_ids" widget="one2many_list" nolabel="1" readonly="1">
 	                       		<tree string="Points">                                                                                                	
-	                                <field name="trans_schemas_id"/>
+	                                <field name="trans_schemas_id">
+	                                	<field name="name_related"/>
+	                                </field>
 	                                <field name="point"/>
+	                                <field name="basic"/>
 	                                <field name="multiple_ditotal"/>
+	                                <field name="multiple_terbesar"/>
 	                                <field name="add_ditotal"/>
-	                                	                               
+	                                <field name="add_terbesar"/>	                               
 	                            </tree>                    
 	                        </field>                                        	
                     	</page>

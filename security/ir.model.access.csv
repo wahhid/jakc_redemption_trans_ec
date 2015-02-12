@@ -1,7 +1,15 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_rdm_trans_manager,rdm.trans.manager,model_rdm_trans,base.group_rdm_manager,1,1,1,1
 access_rdm_trans_operator,rdm.trans.operator,model_rdm_trans,base.group_rdm_operator,1,1,1,0
+
 access_rdm_trans_detail_manager,rdm.trans.detail.manager,model_rdm_trans_detail,base.group_rdm_manager,1,1,1,1
 access_rdm_trans_detail_operator,rdm.trans.detail.operator,model_rdm_trans_detail,base.group_rdm_operator,1,1,1,0
+
+access_rdm_trans_detail_coupon_manager,rdm.trans.detail.coupon.manager,model_rdm_trans_detail_coupon,base.group_rdm_manager,1,1,1,1
+access_rdm_trans_detail_coupon_operator,rdm.trans.detail.coupon.operator,model_rdm_trans_detail_coupon,base.group_rdm_operator,1,1,1,0
+
+access_rdm_trans_detail_point_manager,rdm.trans.detail.point.manager,model_rdm_trans_detail_point,base.group_rdm_manager,1,1,1,1
+access_rdm_trans_detail_point_operator,rdm.trans.detail.point.operator,model_rdm_trans_detail_point,base.group_rdm_operator,1,1,1,0
+
 access_rdm_trans_schemas_manager,rdm.trans.schemas.manager,model_rdm_trans_schemas,base.group_rdm_manager,1,1,1,1
 access_rdm_trans_schemas_operator,rdm.trans.schemas.operator,model_rdm_trans_schemas,base.group_rdm_operator,1,1,1,0

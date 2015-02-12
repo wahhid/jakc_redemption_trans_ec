@@ -52,6 +52,36 @@ class rdm_trans(osv.osv):
         self._post_calculation(cr, uid, ids, context)
         #Close Transaction
         self.write(cr,uid,ids,{'state':'done'},context=context)
+        #Send Notification Email
+        trans_id = ids[0] 
+        trans = self._get_trans(cr, uid, trans_id, context=context)
+        customer_id = trans.customer_id
+        if customer_id.receive_email:
+            email_data = {}
+            email_data.update({'email_from':'info@taman-anggrek-mall.com'})            
+            email_data.update({'email_to':customer_id.email})
+            subject = 'Redemption Transaction Notification'
+            email_data.update({'subject':subject})
+            msg = '<br/>'.join([
+                'Dear Mr/Mrs/Miss' + customer_id.name,
+                '',
+                '',
+                'This is redemption transaction notification for ID :' + trans.trans_id,
+                '',
+                'Total Transaction : ' + str(trans.total_amount),
+                '',
+                'Total Coupon : ' + str(trans.total_coupon),
+                '',
+                'Total Point : ' + str(trans.total_point),
+                '',
+                '',
+                '',
+                'Regards',
+                '',
+                'Mal Taman Anggrek',                
+            ])            
+            email_data.update({'body_html':msg})
+            self._send_email_notification(cr, uid, email_data, context)            
         return True
     
     def _update_print_status(self, cr, uid, ids, context=None):
@@ -427,12 +457,13 @@ class rdm_trans(osv.osv):
         _logger.info('Start Get Total Filter')
         trans_id = ids[0]        
         trans = self._get_trans(cr, uid, trans_id, context)
+        
         total_amount = 0
         total_item = 0        
         for trans_detail in trans.trans_detail_ids:
             total_amount = total_amount + trans_detail.total_amount
             total_item = total_item + trans_detail.total_item
-            
+
         trans_data = {}
         trans_data.update({'total_amount':total_amount})
         trans_data.update({'total_item':total_item})
@@ -466,8 +497,7 @@ class rdm_trans(osv.osv):
     def _calculate_add_coupon_and_point(self, cr, uid, trans_id, context=None):
         _logger.info('Start Calculate Add Coupon and Point')
         
-        trans = self._get_trans(cr, uid, trans_id, context)
-        
+        trans = self._get_trans(cr, uid, trans_id, context)        
         trans_schemas_ids = trans.trans_schemas_ids
         trans_detail_ids =  trans.trans_detail_ids
         customer_id = trans.customer_id                          
@@ -478,19 +508,39 @@ class rdm_trans(osv.osv):
             
             schemas_id = trans_schemas_id.schemas_id               
             schemas_rules_ids = schemas_id.rules_ids
+            max_spend_amount = schemas_id.max_spend_amount
             coupon_spend_amount = schemas_id.coupon_spend_amount
             point_spend_amount = schemas_id.point_spend_amount
+            
                                 
             for trans_detail_id in trans_detail_ids:       
-                _logger.info('-- Calculate for Trans Detail id ' + str(trans_detail_id.id) +' --')         
+                _logger.info('-- Calculate for Trans Detail id ' + str(trans_detail_id.id) +' --')
+                current_day_spend_amount = self.transactions_total_amount(cr, uid, [trans.id], context)                        
+                _logger.info('Current Day Spend Amount : ' +  str(current_day_spend_amount))                
                 tenant = trans_detail_id.tenant_id                
                 bank_id = trans_detail_id.bank_id
                 bank_card_id = trans_detail_id.bank_card_id                
                 payment_type = trans_detail_id.payment_type                
                 
-                total_amount = trans_detail_id.total_amount                            
-                coupon = total_amount / coupon_spend_amount
-                point = total_amount / point_spend_amount
+                diff_spend_amount  = max_spend_amount - current_day_spend_amount
+                _logger.info('Diff Spend Amount : ' + str(diff_spend_amount))
+                
+                if diff_spend_amount <= 0:
+                    total_amount = 0          
+                else:                         
+                    if diff_spend_amount >= trans_detail_id.total_amount:
+                        total_amount = trans_detail_id.total_amount
+                    else:                                                                                    
+                        total_amount = diff_spend_amount
+                     
+                if coupon_spend_amount == 0:
+                    coupon = 0
+                else:                    
+                    coupon = total_amount / coupon_spend_amount
+                if point_spend_amount == 0:
+                    point = 0
+                else:                    
+                    point = total_amount / point_spend_amount
                 
                 rules_add_ditotal_coupon = 0
                 rules_add_terbesar_coupon = 0
@@ -498,7 +548,10 @@ class rdm_trans(osv.osv):
                 rules_add_terbesar_point = 0
                 
                 rules_multiple_ditotal_coupon = 1                
-                rules_multiple_ditotal_point = 1                
+                rules_multiple_ditotal_point = 1
+                rules_multiple_terbesar_coupon = 1                
+                rules_multiple_terbesar_point = 1
+                                
                 
                 schemas_status, message = self._get_tenant_filters(cr, uid, schemas_id, tenant, context=context)
                 
@@ -573,7 +626,7 @@ class rdm_trans(osv.osv):
                             if rule_schema == 'day':
                                 _logger.info('Start Day Schemas')                
                                 today = datetime.date.today().strftime("%Y-%m-%d")
-                                day = rules.day
+                                day = rules_detail_id.day
                                 if today == day :
                                     _logger.info('Match Day : ' + today)
                                     if rules_detail_operation == 'or':
@@ -681,6 +734,43 @@ class rdm_trans(osv.osv):
                                         status = status and False                                                        
                                                             
                                 _logger.info('End Age Schemas')
+                            
+                            #Spending
+                            if rule_schema == 'spending':
+                                _logger.info('Start Spending Amount Schemas')
+                                spending_amount_ids = rules_detail_id.spending_amount_ids                            
+                                spending_amount_rules = False
+                                
+                                for spending_amount_id in spending_amount_ids:
+                                    if spending_amount_id.operator == 'eq':
+                                        if trans_detail_id.total_amount == spending_amount_id.value1:
+                                            spending_amount_rules = True
+                                    if spending_amount_id.operator == 'ne':
+                                        if trans_detail_id.total_amount != spending_amount_id.value1:
+                                            spending_amount_rules = True                                    
+                                    if spending_amount_id.operator== 'lt':
+                                        if trans_detail_id.total_amount < spending_amount_id.value1:
+                                            spending_amount_rules = True
+                                    if spending_amount_id.operator == 'gt':
+                                        if trans_detail_id.total_amount > spending_amount_id.value1:
+                                            spending_amount_rules = True
+                                    if spending_amount_id.operator == 'bw':
+                                        if trans_detail_id.total_amount >= spending_amount_id.value1 and trans_detail_id.total_amount <= spending_amount_id.value2:
+                                            spending_amount_rules = True
+                                                                    
+                                if spending_amount_rules == True:
+                                    _logger.info('Match Spending Amount')
+                                    if rules_detail_operation == 'or':
+                                        status = status or True
+                                    if rules_detail_operation == 'and':
+                                        status = status and True                                                        
+                                else: 
+                                    if rules_detail_operation == 'or':
+                                        status = status or False
+                                    if rules_detail_operation == 'and':
+                                        status = status and False                                                        
+                                                            
+                                _logger.info('End Spending Schemas')
                                                         
                             #Participant
                             if rule_schema == 'participant':
@@ -843,12 +933,17 @@ class rdm_trans(osv.osv):
                                         rules_multiple_ditotal_coupon = rules_multiple_ditotal_coupon * Decimal(quantity)
                                         
                                     if apply_for == '2':
-                                        _logger.info('Current Quantity : ' + str(Decimal(quantity)))
                                         rules_multiple_ditotal_point = rules_multiple_ditotal_point * Decimal(quantity)
-                                        _logger.info('Current Multiple Ditotal Point : ' + str(rules_multiple_ditotal_point))
                                             
                                 if calculation == 'terbesar':
-                                    pass
+                                    if apply_for == '1':
+                                        if rules_multiple_terbesar_coupon < Decimal(quantity):
+                                            rules_multiple_terbesar_coupon = Decimal(quantity)
+                                    
+                                    if apply_for == '2':
+                                        if rules_multiple_terbesar_point < Decimal(quantity):
+                                            rules_multiple_terbesar_point = Decimal(quantity)
+                                    
                         else:
                             _logger.info('Status False')
                                                                        
@@ -872,15 +967,15 @@ class rdm_trans(osv.osv):
                                                                                                                                                
                 if coupon == None:
                     coupon = 1
-                    coupon = (Decimal(coupon) * rules_multiple_ditotal_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
+                    result_coupon = (Decimal(coupon) * rules_multiple_ditotal_coupon * rules_multiple_terbesar_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
                 else:
-                    coupon = (Decimal(coupon) * rules_multiple_ditotal_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
+                    result_coupon = (Decimal(coupon) * rules_multiple_ditotal_coupon * rules_multiple_terbesar_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
                     
                 if point == None:
                     point = 1
-                    point = (Decimal(point) * rules_multiple_ditotal_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
+                    result_point = (Decimal(point) * rules_multiple_ditotal_point * rules_multiple_terbesar_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
                 else:                    
-                    point = (Decimal(point) * rules_multiple_ditotal_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
+                    result_point = (Decimal(point) * rules_multiple_ditotal_point * rules_multiple_terbesar_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
                 
                 _logger.info('Total Coupon : ' + str(coupon))                                                               
                 _logger.info('Total Point : ' + str(point))           
@@ -888,8 +983,10 @@ class rdm_trans(osv.osv):
                 trans_detail_coupon_data = {}
                 trans_detail_coupon_data.update({'trans_detail_id': trans_detail_id.id})
                 trans_detail_coupon_data.update({'trans_schemas_id': trans_schemas_id.id})
-                trans_detail_coupon_data.update({'coupon': coupon})
+                trans_detail_coupon_data.update({'basic': coupon})
+                trans_detail_coupon_data.update({'coupon': result_coupon})
                 trans_detail_coupon_data.update({'multiple_ditotal': rules_multiple_ditotal_coupon})
+                trans_detail_coupon_data.update({'multiple_terbesar': rules_multiple_terbesar_coupon})                
                 trans_detail_coupon_data.update({'add_ditotal': rules_add_ditotal_coupon})
                 trans_detail_coupon_data.update({'add_terbesar': rules_add_terbesar_coupon})                
                 self.pool.get('rdm.trans.detail.coupon').create(cr, uid, trans_detail_coupon_data, context=context)                    
@@ -897,31 +994,51 @@ class rdm_trans(osv.osv):
                 trans_detail_point_data = {}
                 trans_detail_point_data.update({'trans_detail_id': trans_detail_id.id})
                 trans_detail_point_data.update({'trans_schemas_id': trans_schemas_id.id})
-                trans_detail_point_data.update({'point': point})
-                trans_detail_coupon_data.update({'multiple_ditotal': rules_multiple_ditotal_point})
-                trans_detail_coupon_data.update({'add_ditotal': rules_add_ditotal_point})
-                trans_detail_coupon_data.update({'add_terbesar': rules_add_terbesar_point})                            
-                self.pool.get('rdm.trans.detail.point').create(cr, uid, trans_detail_point_data, context=context)                    
+                trans_detail_point_data.update({'basic': point})
+                trans_detail_point_data.update({'point': result_point})
+                trans_detail_point_data.update({'multiple_ditotal': rules_multiple_ditotal_point})
+                trans_detail_point_data.update({'multiple_terbesar': rules_multiple_terbesar_point})
+                trans_detail_point_data.update({'add_ditotal': rules_add_ditotal_point})
+                trans_detail_point_data.update({'add_terbesar': rules_add_terbesar_point})                                          
+                self.pool.get('rdm.trans.detail.point').create(cr, uid, trans_detail_point_data, context=context)
+                
+                #Update Redemption Trans Detail Status For Already Calculated         
+                self.pool.get('rdm.trans.detail').trans_close(cr, uid, [trans_detail_id.id], context=context)           
                 
         _logger.info('End Calculate Add Coupon and Point')
                     
     def _calculate_schemas_total_coupon_and_point(self, cr, uid, trans_id, context=None):
-        _logger.info('Start Calculate Schemas Total Coupon and Point')
-        
-        total_coupon = 0
-        total_point = 0
-        
+        _logger.info('Start Calculate Schemas Total Coupon and Point')        
         trans = self._get_trans(cr, uid, trans_id, context)
         trans_schemas_ids = trans.trans_schemas_ids
         
-        for trans_schemas_id in trans_schemas_ids:            
-            total_coupon = total_coupon + self.pool.get('rdm.trans.detail.coupon').total_coupon(cr, uid, trans_schemas_id.id, context=context)
-            total_point = total_point + self.pool.get('rdm.trans.detail.point').total_point(cr, uid, trans_schemas_id.id, context=context)
+        for trans_schemas_id in trans_schemas_ids:
             
-        trans_schemas_data = {}
-        trans_schemas_data.update({'total_coupon':total_coupon})
-        trans_schemas_data.update({'total_point':total_point})            
-        self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id.id], trans_schemas_data, context=context)
+            total_coupon = 0
+            total_point = 0
+            
+            args = [('trans_schemas_id','=', trans_schemas_id.id)]  
+            
+            trans_coupon_ids = self.pool.get('rdm.trans.detail.coupon').search(cr, uid, args, context=context)
+            trans_coupons = self.pool.get('rdm.trans.detail.coupon').browse(cr, uid, trans_coupon_ids, context=context)            
+            for trans_coupon in trans_coupons:
+                total_coupon = total_coupon + trans_coupon.coupon
+            
+            _logger.info('Total Coupon for ' + str(trans_schemas_id.id) + ' : ' + str(total_coupon))
+            
+            trans_point_ids = self.pool.get('rdm.trans.detail.point').search(cr, uid, args, context=context)
+            trans_points = self.pool.get('rdm.trans.detail.point').browse(cr, uid, trans_point_ids, context=context)
+            for trans_point in trans_points:
+                total_point = total_point + trans_point.point
+                
+            _logger.info('Total Point for ' + str(trans_schemas_id.id) + ' : ' + str(total_point))    
+            #total_coupon = total_coupon + self.pool.get('rdm.trans.detail.coupon').total_coupon(cr, uid, trans_schemas_id.id, context=context)
+            #total_point = total_point + self.pool.get('rdm.trans.detail.point').total_point(cr, uid, trans_schemas_id.id, context=context)
+            
+            trans_schemas_data = {}
+            trans_schemas_data.update({'total_coupon':total_coupon})
+            trans_schemas_data.update({'total_point':total_point})            
+            self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id.id], trans_schemas_data, context=context)
             
         _logger.info('End Calculate Schemas Total Coupon and Point')
         
@@ -932,7 +1049,7 @@ class rdm_trans(osv.osv):
         total_point = 0
         
         trans = self._get_trans(cr, uid, trans_id, context)
-        trans_schemas_ids = trans.trans_schemas_ids
+        trans_schemas_ids = trans.trans_schemas_ids 
         
         for trans_schemas_id in trans_schemas_ids:            
             total_coupon = total_coupon + trans_schemas_id.total_coupon
@@ -950,7 +1067,7 @@ class rdm_trans(osv.osv):
         trans = self._get_trans(cr, uid, trans_id, context)
         trans_schemas_ids = trans.trans_schemas_ids
         for trans_schemas_id in trans_schemas_ids:
-            _logger.info('Total Coupon :' + str(trans.total_coupon))
+            _logger.info('Trans_ Schemas Total Coupon :' + str(trans_schemas_id.total_coupon))
             schemas_id = trans_schemas_id.schemas_id            
             coupon_data = {}
             coupon_data.update({'customer_id':trans.customer_id.id})
@@ -967,20 +1084,20 @@ class rdm_trans(osv.osv):
         trans_schemas_ids = trans.trans_schemas_ids
         for trans_schemas_id in trans_schemas_ids:
             schemas_id = trans_schemas_id.schemas_id
-            _logger.info('Total Point :' + str(trans.total_point))
+            _logger.info('Total Point :' + str(trans_schemas_id.total_point))
             point_data = {}
             point_data.update({'customer_id': trans.customer_id.id})
             point_data.update({'trans_id':trans.id})
             point_data.update({'trans_type': 'promo'})
             point_data.update({'point':trans_schemas_id.total_point})
-            point_data.update({'expired_date': schemas_id.end_date})
+            point_data.update({'expired_date': schemas_id.point_expired_date})
             self.pool.get('rdm.customer.point').create(cr, uid, point_data, context=context)
         _logger.info('End Generate Coupon')
     
-    def _generate_voucher(self, cr, uid, trans_id, context=None):
-        _logger.info('Start Generate Voucher')
+    def _generate_reward(self, cr, uid, trans_id, context=None):
+        _logger.info('Start Generate Reward')
         pass
-        _logger.info('End Generate Voucher')
+        _logger.info('End Generate Reward')
         
     def _define_trans_schemas(self, cr, uid, ids, context=None):
         trans_id  = ids[0]
@@ -1031,7 +1148,22 @@ class rdm_trans(osv.osv):
             }, context=context))
         mail_mail.send(cr, uid, mail_ids, context=context)
         _logger.info('End Send Email Notification')
-        
+    
+    def transactions_total_amount(self, cr, uid, ids, context=None):
+        trans_id = ids[0]
+        trans = self._get_trans(cr, uid, trans_id, context)
+        customer_id = trans.customer_id        
+        args = [('customer_id','=',customer_id.id),('trans_date','=','2015-02-12')]
+        trans_ids = self.search(cr, uid, args, context=context)
+        trans_id_alls = self.browse(cr, uid, trans_ids, context=context)
+        total_amount = 0
+        for trans_id_all in trans_id_alls:
+            trans_detail_ids = trans_id_all.trans_detail_ids
+            for trans_detail_id in trans_detail_ids:
+                if trans_detail_id.state == 'done':
+                    total_amount = total_amount + trans_detail_id.total_amount        
+        return total_amount
+    
     _columns = {
         'trans_id': fields.char('Transaction ID',size=13, readonly=True),
         'customer_id': fields.many2one('rdm.customer','Customer',required=True),
@@ -1043,8 +1175,7 @@ class rdm_trans(osv.osv):
         'total_point': fields.integer('Total Point', readonly=True),          
         'state':  fields.selection(AVAILABLE_STATES, 'Status', size=16, readonly=True),
         'trans_detail_ids': fields.one2many('rdm.trans.detail','trans_id','Details'),
-        'trans_schemas_ids': fields.one2many('rdm.trans.schemas','trans_id','Schemas'),
-        'trans_detail_rules_ids': fields.one2many('rdm.trans.detail.rules','trans_id','Rules'),        
+        'trans_schemas_ids': fields.one2many('rdm.trans.schemas','trans_id','Schemas'),            
         'customer_coupon_ids': fields.one2many('rdm.customer.coupon','trans_id','Coupons'),
         'customer_point_ids': fields.one2many('rdm.customer.point','trans_id','Points'),        
         'remark': fields.text('Remark',readonly=True),
@@ -1108,6 +1239,11 @@ class rdm_trans_detail(osv.osv):
     _name = "rdm.trans.detail"
     _description = "Redemption Promo Transaction Detail"
     
+    def trans_close(self, cr, uid, ids, context=None):
+        data = {}
+        data.update({'state':'done'})
+        self.write(cr, uid, ids, data, context=context)
+        
     def onchange_bank_id(self, cr, uid, ids, bank_id, context=None):
         _logger.info('Start Onchange Bank ID')
         return {'domain':{'bank_card_id':[('bank_id','=', bank_id)]}}        
@@ -1134,6 +1270,7 @@ class rdm_trans_detail(osv.osv):
         'trans_date': fields.date.context_today, 
         'payment_type': lambda *a: 'cash',
         'tenant_filter': lambda *a: False,
+        'state': lambda *a: 'open',
     }
     
     def unlink(self, cr, uid, ids, context=None):
@@ -1146,21 +1283,23 @@ rdm_trans_detail()
 class rdm_trans_detail_coupon(osv.osv):
     _name = "rdm.trans.detail.coupon"
     _description = "Redemption Transaction Detail Coupon"
-    
+
     def total_coupon(self, cr, uid, trans_schemas_id, context=None):        
         sql_req= "SELECT sum(c.coupon) as total FROM rdm_trans_detail_coupon c WHERE c.trans_schemas_id=" + str(trans_schemas_id)         
         cr.execute(sql_req)
         sql_res = cr.dictfetchone()
-        total_coupon = sql_res['total'] 
+        total_coupon = sql_res['total']
         if total_coupon == None:
-            total_coupon = 0   
+            total_coupon = 0    
         return total_coupon
-    
+            
     _columns = {
         'trans_detail_id': fields.many2one('rdm.trans.detail','Transaction Detail'),
-        'trans_schemas_id': fields.many2one('rdm.trans.schemas','Transaction Schemas'),            
-        'coupon': fields.integer('Coupon'),
+        'trans_schemas_id': fields.many2one('rdm.trans.schemas','Transaction Schemas'),
+        'basic': fields.float('Basic'),            
+        'coupon': fields.float('Coupon'),
         'multiple_ditotal': fields.float('Mutiple Ditotal'),
+        'multiple_terbesar': fields.float('Mutiple Terbesar'),
         'add_ditotal': fields.float('Add Ditotal'),
         'add_terbesar': fields.float('Add Terbesar'),
     }    
@@ -1182,13 +1321,26 @@ class rdm_trans_detail_point(osv.osv):
     _columns = {
         'trans_detail_id': fields.many2one('rdm.trans.detail','Transaction Detail'),
         'trans_schemas_id': fields.many2one('rdm.trans.schemas','Transaction Schemas'),
-        'point': fields.integer('point'),
+        'basic': fields.float('Basic'),
+        'point': fields.float('Point'),
         'multiple_ditotal': fields.float('Mutiple Ditotal'),
+        'multiple_terbesar': fields.float('Mutiple Terbesar'),
         'add_ditotal': fields.float('Add Ditotal'),
         'add_terbesar': fields.float('Add Terbesar'),        
     }    
 rdm_trans_detail_point()
 
+
+class rdm_trans_detail_reward(osv.osv):
+    _name = "rdm.trans.detail.reward"
+    _description = "Redemption Transaction Detail Reward"
+    _columns = {
+        'trans_detail_id': fields.many2one('rdm.trans.detail','Transaction Detail'),
+        'trans_schemas_id': fields.many2one('rdm.trans.schemas','Transaction Schemas'),        
+        'reward_id': fields.many2one('rdm.reward','Reward'),
+        'quantity': fields.integer('Quantity'),
+    }    
+rdm_trans_detail_reward()
 
 class rdm_trans_schemas(osv.osv):
     _name = "rdm.trans.schemas"
