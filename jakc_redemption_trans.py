@@ -522,7 +522,13 @@ class rdm_trans(osv.osv):
                 bank_card_id = trans_detail_id.bank_card_id                
                 payment_type = trans_detail_id.payment_type                
                 
-                diff_spend_amount  = max_spend_amount - current_day_spend_amount
+                if max_spend_amount == -1:
+                    _logger.info('Unlimited Spend Amount')
+                    diff_spend_amount = trans_detail_id.total_amount
+                else:
+                    _logger.info('Limited Spend Amount')    
+                    diff_spend_amount  = max_spend_amount - current_day_spend_amount
+                
                 _logger.info('Diff Spend Amount : ' + str(diff_spend_amount))
                 
                 if diff_spend_amount <= 0:
@@ -860,8 +866,8 @@ class rdm_trans(osv.osv):
                                 rules_bank_ids = rules_detail_id.bank_ids
                                 bank_card_list = {}
                                 for rules_bank in rules_bank_ids:
-                                    bank_id  = rules_bank.bank_id
-                                    bank_card_list.update({bank_id.id:bank_id.name})
+                                    bank  = rules_bank.bank_id
+                                    bank_card_list.update({bank.id:bank.name})
                                                                         
                                 bank_rules = False                                                
                                 if payment_type == 'creditcard' or payment_type == 'debit':                                    
@@ -891,10 +897,10 @@ class rdm_trans(osv.osv):
                                     bank_card_list.update({bank_card_id.id:bank_card_id.name})
                                         
                                 trans_detail_ids = trans.trans_detail_ids
-                                bank_card_rules = False                                                
+                                bank_card_rules = True                                                
                                 if payment_type == 'creditcard' or payment_type == 'debit':                                    
                                     if bank_card_id.id in bank_card_list.keys():
-                                        bank_card_rules = True
+                                        bank_card_rules = False
                                             
                                 if bank_card_rules:                        
                                     _logger.info('Match Bank Card')
@@ -907,7 +913,36 @@ class rdm_trans(osv.osv):
                                         status = status or False
                                     if rules_detail_operation == 'and':
                                         status = status and False    
-                                               
+                            
+                            #Cash     
+                            if rule_schema == 'cash':
+                                _logger.info('Start Cash Schemas')                                         
+                                rules_cash_bank_ids = rules_detail_id.cash_ids
+                                cash_bank_list = {}
+                                for rules_cash_bank in rules_cash_bank_ids:
+                                    cash_bank  = rules_cash_bank.bank_id
+                                    cash_bank_list.update({cash_bank.id:cash_bank.name})
+                                                                        
+                                cash_rules = True
+                                if payment_type == 'creditcard' or payment_type == 'debit':
+                                    if bank_id.id in cash_bank_list.keys():
+                                        _logger.info('Card Detected')
+                                        cash_rules = False           
+                                    else:
+                                        _logger.info('Card Not Detected') 
+                                                                                                                    
+                                if cash_rules:                        
+                                    _logger.info('Match Cash')
+                                    if rules_detail_operation == 'or':
+                                        status = status or True
+                                    if rules_detail_operation == 'and':
+                                        status = status and True                                                        
+                                else: 
+                                    if rules_detail_operation == 'or':
+                                        status = status or False
+                                    if rules_detail_operation == 'and':
+                                        status = status and False        
+                                                           
                         if status == True:         
                             _logger.info('Status True')               
                             if operation == 'add':
@@ -917,7 +952,7 @@ class rdm_trans(osv.osv):
                                                                         
                                     if apply_for == '2':
                                         rules_add_ditotal_point = rules_add_ditotal_point + Decimal(quantity)                                                                    
-                                                                                
+                                                                                                                  
                                 if calculation == 'terbesar':
                                     if apply_for == '1':                                
                                         if rules_add_terbesar_coupon < Decimal(quantity):
@@ -991,6 +1026,7 @@ class rdm_trans(osv.osv):
                 trans_detail_coupon_data.update({'add_terbesar': rules_add_terbesar_coupon})                
                 self.pool.get('rdm.trans.detail.coupon').create(cr, uid, trans_detail_coupon_data, context=context)                    
                 
+                        
                 trans_detail_point_data = {}
                 trans_detail_point_data.update({'trans_detail_id': trans_detail_id.id})
                 trans_detail_point_data.update({'trans_schemas_id': trans_schemas_id.id})
@@ -1010,12 +1046,14 @@ class rdm_trans(osv.osv):
     def _calculate_schemas_total_coupon_and_point(self, cr, uid, trans_id, context=None):
         _logger.info('Start Calculate Schemas Total Coupon and Point')        
         trans = self._get_trans(cr, uid, trans_id, context)
+        customer_id = trans.customer_id        
         trans_schemas_ids = trans.trans_schemas_ids
         
         for trans_schemas_id in trans_schemas_ids:
             
             total_coupon = 0
             total_point = 0
+            schemas_id = trans_schemas_id.schemas_id
             
             args = [('trans_schemas_id','=', trans_schemas_id.id)]  
             
@@ -1036,7 +1074,21 @@ class rdm_trans(osv.osv):
             #total_point = total_point + self.pool.get('rdm.trans.detail.point').total_point(cr, uid, trans_schemas_id.id, context=context)
             
             trans_schemas_data = {}
+            if schemas_id.limit_coupon > -1 :
+                if total_coupon > schemas_id.limit_coupon:
+                    total_coupon = schemas_id.limit_coupon
+                    
             trans_schemas_data.update({'total_coupon':total_coupon})
+            
+            #Check Limit Point Per Schemas
+            #Customer without email will not get point
+            if customer_id.email is not None:
+                if schemas_id.limit_point > -1 :
+                    if total_point > schemas_id.limit_point:
+                        total_point =  schemas_id.limit_point
+            else:
+                total_point = 0
+                                                
             trans_schemas_data.update({'total_point':total_point})            
             self.pool.get('rdm.trans.schemas').write(cr, uid, [trans_schemas_id.id], trans_schemas_data, context=context)
             
@@ -1153,7 +1205,8 @@ class rdm_trans(osv.osv):
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
         customer_id = trans.customer_id        
-        args = [('customer_id','=',customer_id.id),('trans_date','=','2015-02-12')]
+        today = datetime.datetime.now()
+        args = [('customer_id','=',customer_id.id),('trans_date','=', today.strftime('%Y-%m-%d'))]
         trans_ids = self.search(cr, uid, args, context=context)
         trans_id_alls = self.browse(cr, uid, trans_ids, context=context)
         total_amount = 0
@@ -1177,7 +1230,8 @@ class rdm_trans(osv.osv):
         'trans_detail_ids': fields.one2many('rdm.trans.detail','trans_id','Details'),
         'trans_schemas_ids': fields.one2many('rdm.trans.schemas','trans_id','Schemas'),            
         'customer_coupon_ids': fields.one2many('rdm.customer.coupon','trans_id','Coupons'),
-        'customer_point_ids': fields.one2many('rdm.customer.point','trans_id','Points'),        
+        'customer_point_ids': fields.one2many('rdm.customer.point','trans_id','Points'),
+        'customer_reward_ids': fields.one2many('rdm.reward.trans','trans_id','Rewards'),        
         'remark': fields.text('Remark',readonly=True),
         'printed': fields.boolean('Printed', readonly=True),
         'reprint': fields.integer('Reprint', readonly=True),
@@ -1225,7 +1279,11 @@ class rdm_trans(osv.osv):
             else: 
                 raise osv.except_osv(('Warning'), ('Edit not allowed, Transaction already closed!'))            
         else:
-            result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)            
+            result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)
+                        
+            #Calculate Total Amount
+            self._get_total_amount(cr, uid, ids, context)
+                        
             return result        
 
     def unlink(self, cr, uid, ids, context=None):
@@ -1261,7 +1319,7 @@ class rdm_trans_detail(osv.osv):
         'bank_card_id': fields.many2one('rdm.bank.card','Bank Card'),                                
         'card_number': fields.char('Card Number', size=20),        
         'trans_detail_coupon_ids': fields.one2many('rdm.trans.detail.coupon','trans_detail_id','Coupons'),
-        'trans_detail_point_ids': fields.one2many('rdm.trans.detail.point','trans_detail_id','Points'),        
+        'trans_detail_point_ids': fields.one2many('rdm.trans.detail.point','trans_detail_id','Points'),            
         'state':  fields.selection(AVAILABLE_STATES, 'Status', size=16, readonly=True),
         'deleted': fields.boolean('Deleted'),      
     }

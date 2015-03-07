@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<openerp>
+    <data>
+        <record id="view_rdm_reward_trans_form_inherit_rdm_trans" model="ir.ui.view">
+            <field name="name">rdm.reward.trans.form.inherit.rdm.trans</field>
+            <field name="model">rdm.reward.trans</field>
+            <field name="type">form</field>
+            <field name="inherit_id" ref="jakc_redemption_reward.view_rdm_reward_trans_form"/>					
+            <field name="arch" type="xml">
+				<field name="trans_date" position="after">
+            		<field name="trans_id"/>
+        		</field>                        	
+            </field>
+        </record>
+    </data>
+</openerp>

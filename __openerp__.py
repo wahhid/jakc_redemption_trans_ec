@@ -10,6 +10,7 @@
         'jakc_redemption_trans_view.xml',        
         'jakc_redemption_trans_menu.xml',  
         'jakc_redemption_customer_view.xml',
+        'jakc_redemption_reward_view.xml',        
     ],
     'installable': True,
     'auto_install': False,
