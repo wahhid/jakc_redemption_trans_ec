@@ -46,44 +46,24 @@ class rdm_trans(osv.osv):
     _name =  "rdm.trans"
     _description = "Redemption Transaction"
     
-    def trans_close(self, cr, uid, ids, context=None):    
+    def trans_close(self, cr, uid, ids, context=None):
+        values = {}
+        values.update({'state':'done'})
+        self.write(cr,uid,ids,values,context=context)
+        return True
+        
+    def process_close(self, cr, uid, ids, context=None):    
         _logger.info("Close Transaction for ID : " + str(ids))    
         #Post Calculation
-        self._post_calculation(cr, uid, ids, context)
-        #Close Transaction
-        self.write(cr,uid,ids,{'state':'done'},context=context)
+        self._post_calculation(cr, uid, ids, context)            
         #Send Notification Email
         trans_id = ids[0] 
-        trans = self._get_trans(cr, uid, trans_id, context=context)
-        customer_id = trans.customer_id
-        if customer_id.receive_email:
-            email_data = {}
-            email_data.update({'email_from':'info@taman-anggrek-mall.com'})            
-            email_data.update({'email_to':customer_id.email})
-            subject = 'Redemption Transaction Notification'
-            email_data.update({'subject':subject})
-            msg = '<br/>'.join([
-                'Dear Mr/Mrs/Miss' + customer_id.name,
-                '',
-                '',
-                'This is redemption transaction notification for ID :' + trans.trans_id,
-                '',
-                'Total Transaction : ' + str(trans.total_amount),
-                '',
-                'Total Coupon : ' + str(trans.total_coupon),
-                '',
-                'Total Point : ' + str(trans.total_point),
-                '',
-                '',
-                '',
-                'Regards',
-                '',
-                'Mal Taman Anggrek',                
-            ])            
-            email_data.update({'body_html':msg})
-            self._send_email_notification(cr, uid, email_data, context)            
+        trans = self._get_trans(cr, uid, trans_id, context=context)            
+        rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)        
+        if rdm_config.enable_email and trans.customer_id.receive_email:            
+            self.send_mail_to_customer(cr, uid, [trans_id], context)                        
         return True
-    
+
     def _update_print_status(self, cr, uid, ids, context=None):
         _logger.info("Start Update Print Status for ID : " + str(ids))
         values = {}
@@ -124,21 +104,34 @@ class rdm_trans(osv.osv):
         self.write(cr, uid, ids, values, context=context)
         _logger.info("End Trans Reset")
         return True
-    
+
     def trans_req_delete(self, cr, uid, ids, context=None):
+        _logger.info("Start Trans Req Delete")        
+        values = {}
+        values.update({'bypass':True})
+        values.update({'method':'trans_req_delete'})
+        values.update({'state':'req_delete'})
+        self.write(cr, uid, ids, values, context=context)
+        _logger.info("End Trans Req Delete")
+        return True
+    
+    def process_req_delete(self, cr, uid, ids, context=None):
         #self.write(cr,uid,ids,{'reg_delete':'done'},context=context)
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
         rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
-        if rdm_config.trans_delete_allowed == True:
+        rdm_trans_config = self.pool.get('rdm.trans.config').get_config(cr, uid, context=context)
+        if rdm_trans_config.trans_delete_allowed == True:
             values = {}
             values.update({'bypass':True})
             values.update({'method': 'trans_req_delete'})
             values.update({'state': 'req_delete'})
             self.write(cr, uid, ids, values, context=context)
             trans_detail_ids = trans.trans_detail_ids
+                        
             for trans_detail in trans_detail_ids:
-                self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})
+                self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'req_delete'})            
+                
             customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
             self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'req_delete'})
             customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
@@ -146,7 +139,7 @@ class rdm_trans(osv.osv):
             #Send Email to Approver
             email_data = {}
             email_data.update({'email_from':'info@taman-anggrek-mall.com'})
-            approver_id = rdm_config.trans_delete_approver
+            approver_id = rdm_trans_config.trans_delete_approver
             approver = self.pool.get('hr.employee').browse(cr, uid, approver_id, context=context)
             email_data.update({'email_to':approver.work_email})
             subject = 'Request for Delete Transaction'
@@ -170,53 +163,67 @@ class rdm_trans(osv.osv):
             return True
         else:
             raise osv.except_osv(('Warning'), ('Request for delete not allowed!'))
-            
+    
     def trans_del_approve(self, cr, uid, ids, context=None):
+        values = {}
+        values.update({'bypass':True})
+        values.update({'method': 'trans_del_approve'})
+        values.update({'state': 'delete'})
+        self.write(cr, uid, ids, values, context=context)
+        return True
+        
+    def process_del_approve(self, cr, uid, ids, context=None):
+        
         trans_id = ids[0]
-        trans = self._get_trans(cr, uid, trans_id, context)
+        trans = self._get_trans(cr, uid, trans_id, context)            
         rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
-        approver = self.pool.get('hr.employee').browse(cr, uid, [rdm_config.trans_delete_approver], context=context)[0]
-        if approver.user_id.id == uid:
-            values = {}
-            values.update({'bypass':True})
-            values.update({'method': 'trans_del_approve'})
-            values.update({'state': 'delete'})
-            self.write(cr, uid, ids, values, context=context)
-            
+        rdm_trans_config = self.pool.get('rdm.trans.config').get_config(cr, uid, context=context)
+        approver = self.pool.get('hr.employee').browse(cr, uid, [rdm_trans_config.trans_delete_approver], context=context)[0]
+        if approver.user_id.id == uid:            
             trans_detail_ids = trans.trans_detail_ids
             for trans_detail in trans_detail_ids:
                 self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'delete'})
                 
             customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-            self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids[0], {'state':'expired'})
+            self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'delete'})
             customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-            self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids[0], {'state':'expired'})            
+            self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'delete'})            
         else:
             raise osv.except_osv(('Warning'), ('Approve Process not allowed!')) 
-        
+
+        return True
+    
     def trans_del_reject(self, cr, uid, ids, context=None):
+        values = {}
+        values.update({'bypass':True})
+        values.update({'method': 'trans_del_reject'})
+        values.update({'state': 'done'})
+        return self.write(cr, uid, ids, values, context=context)
+                                
+    def process_del_reject(self, cr, uid, ids, context=None):                    
+                    
         trans_id = ids[0]
-        trans = self._get_trans(cr, uid, trans_id, context)
-        rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
-        approver = self.pool.get('hr.employee').browse(cr, uid, [rdm_config.trans_delete_approver], context=context)[0]
-        if approver.user_id.id == uid:
-            values = {}
-            values.update({'bypass':True})
-            values.update({'method': 'trans_del_reject'})
-            values.update({'state': 'done'})
-            self.write(cr, uid, ids, values, context=context)
+        trans = self._get_trans(cr, uid, trans_id, context)        
             
+        rdm_config = self.pool.get('rdm.config').get_config(cr, uid, context=context)
+        rdm_trans_config = self.pool.get('rdm.trans.config').get_config(cr, uid, context=context)
+        approver = self.pool.get('hr.employee').browse(cr, uid, [rdm_trans_config.trans_delete_approver], context=context)[0]
+        if approver.user_id.id == uid:
+                        
             trans_detail_ids = trans.trans_detail_ids
             for trans_detail in trans_detail_ids:
                 self.pool.get('rdm.trans.detail').write(cr, uid, trans_detail.id, {'state':'done'})
             
-            customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-            self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids[0], {'state':'active'})
+            customer_coupon_ids = self.pool.get('rdm.customer.coupon').search(cr, uid, [('trans_id','=',trans_id)],context=context)            
+            self.pool.get('rdm.customer.coupon').write(cr, uid, customer_coupon_ids, {'state':'active'})
+            
             customer_point_ids = self.pool.get('rdm.customer.point').search(cr, uid, [('trans_id','=',trans_id)],context=context)
-            self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids[0], {'state':'active'})            
+            self.pool.get('rdm.customer.point').write(cr, uid, customer_point_ids, {'state':'active'})            
         else:
             raise osv.except_osv(('Warning'), ('Reject Process not allowed!')) 
         
+        return True
+    
     def _get_active_schemas(self, cr, uid, context=None):          
         _logger.info("Start Get Active Schemas")
         schemas_type = None            
@@ -515,7 +522,8 @@ class rdm_trans(osv.osv):
                                 
             for trans_detail_id in trans_detail_ids:       
                 _logger.info('-- Calculate for Trans Detail id ' + str(trans_detail_id.id) +' --')
-                current_day_spend_amount = self.transactions_total_amount(cr, uid, [trans.id], context)                        
+                ##current_day_spend_amount = self.transactions_total_amount(cr, uid, [trans.id], context)
+                current_day_spend_amount = self.transactions_total_amount(cr, uid, trans, schemas_id, customer_id, context)                                    
                 _logger.info('Current Day Spend Amount : ' +  str(current_day_spend_amount))                
                 tenant = trans_detail_id.tenant_id                
                 bank_id = trans_detail_id.bank_id
@@ -1097,21 +1105,34 @@ class rdm_trans(osv.osv):
     def _calculate_total_coupon_and_point(self, cr, uid, trans_id, context=None):
         _logger.info('Start Calculate Total Coupon and Point')
         
+        ditotal_coupon = 0
+        terbesar_coupon = 0
+        ditotal_point = 0
+        terbesar_point = 0
+                
         total_coupon = 0
         total_point = 0
         
         trans = self._get_trans(cr, uid, trans_id, context)
         trans_schemas_ids = trans.trans_schemas_ids 
         
-        for trans_schemas_id in trans_schemas_ids:            
-            total_coupon = total_coupon + trans_schemas_id.total_coupon
-            total_point = total_point + trans_schemas_id.total_point
+        for trans_schemas_id in trans_schemas_ids:  
+            schemas_id = trans_schemas_id.schemas_id
+            if schemas_id.calculation == 'ditotal':          
+                ditotal_coupon = ditotal_coupon + trans_schemas_id.total_coupon
+                ditotal_point = total_point + trans_schemas_id.total_point
+            if schemas_id.calculation == 'terbesar':
+                if terbesar_coupon < trans_schemas_id.total_coupon:
+                    terbesar_coupon = trans_schemas_id.total_coupon
+                if terbesar_point < trans_schemas_id.total_point:
+                    terbesar_point = trans_schemas_id.total_point
+                
                         
         trans_data = {}
-        trans_data.update({'total_coupon':total_coupon})
-        trans_data.update({'total_point':total_point})            
+        trans_data.update({'total_coupon':ditotal_coupon + terbesar_coupon})
+        trans_data.update({'total_point':ditotal_point + terbesar_point})            
         self.pool.get('rdm.trans').write(cr, uid, [trans.id], trans_data, context=context)
-            
+
         _logger.info('End Calculate Total Coupon and Point')        
 
     def _generate_coupon(self, cr, uid, trans_id, context=None):
@@ -1127,7 +1148,7 @@ class rdm_trans(osv.osv):
             coupon_data.update({'trans_type':'promo'})        
             coupon_data.update({'coupon':trans_schemas_id.total_coupon})
             coupon_data.update({'expired_date':schemas_id.end_date})
-            self.pool.get('rdm.customer.coupon').add_coupon(cr, uid, coupon_data, context=context)
+            self.pool.get('rdm.customer.coupon').create(cr, uid, coupon_data, context=context)
         _logger.info('End Generate Coupon')
             
     def _generate_point(self, cr, uid, trans_id, context=None):
@@ -1187,6 +1208,8 @@ class rdm_trans(osv.osv):
         self._generate_coupon(cr, uid, trans_id, context=context)
         #Generate Point
         self._generate_point(cr, uid, trans_id, context=context)
+        #Send Email Notification
+    
                                         
     def _send_email_notification(self, cr, uid, values, context=None):
         _logger.info('Start Send Email Notification')
@@ -1201,22 +1224,57 @@ class rdm_trans(osv.osv):
         mail_mail.send(cr, uid, mail_ids, context=context)
         _logger.info('End Send Email Notification')
     
-    def transactions_total_amount(self, cr, uid, ids, context=None):
+    def send_mail_to_customer(self, cr, uid, ids, context=None):
+        #res_id = self.read(cr, uid, ids, ['boq_item_ids'], context)[0]['id']
         trans_id = ids[0]
         trans = self._get_trans(cr, uid, trans_id, context)
-        customer_id = trans.customer_id        
+        email_obj = self.pool.get('email.template')        
+        template_ids = email_obj.search(cr, uid, [('name', '=', 'Redemption Trans Notification')])
+        email = email_obj.browse(cr, uid, template_ids[0])  
+        email_obj.write(cr, uid, template_ids, {'email_from': email.email_from,
+                                                'email_to': email.email_to,
+                                                'subject': email.subject,
+                                                'body_html': email.body_html,
+                                                'email_recipients': email.email_recipients})
+        email_obj.send_mail(cr, uid, template_ids[0], trans.id, True, context=context)
+
+    def transactions_total_amount(self, cr, uid, trans_id, schemas_id, customer_id, context=None):
+        #trans_id = ids[0]
+        #trans = self._get_trans(cr, uid, trans_id, context)
+        #customer_id = trans.customer_id        
+        
         today = datetime.datetime.now()
-        args = [('customer_id','=',customer_id.id),('trans_date','=', today.strftime('%Y-%m-%d'))]
-        trans_ids = self.search(cr, uid, args, context=context)
-        trans_id_alls = self.browse(cr, uid, trans_ids, context=context)
-        total_amount = 0
-        for trans_id_all in trans_id_alls:
-            trans_detail_ids = trans_id_all.trans_detail_ids
-            for trans_detail_id in trans_detail_ids:
-                if trans_detail_id.state == 'done':
-                    total_amount = total_amount + trans_detail_id.total_amount        
+        sql_req = '''SELECT 
+                    sum(rdm_trans_detail.total_amount) as total_amount
+                 FROM 
+                    public.rdm_trans, 
+                    public.rdm_customer, 
+                    public.rdm_trans_schemas, 
+                    public.rdm_schemas,
+                    public.rdm_trans_detail
+                WHERE 
+                  rdm_trans.customer_id = rdm_customer.id AND
+                  rdm_trans_schemas.trans_id = rdm_trans.id AND
+                  rdm_trans_schemas.schemas_id = rdm_schemas.id AND
+                  rdm_trans_detail.trans_id = rdm_trans.id AND
+                  rdm_customer.id = {0} AND                   
+                  rdm_schemas.id = {1} AND
+                  rdm_trans.trans_date = '{2}' AND
+                  rdm_trans_detail.state = 'done' AND
+                  rdm_trans.id != {3}                                
+            '''.format(customer_id.id,schemas_id.id,today.strftime('%Y-%m-%d'), trans_id.id)
+
+        cr.execute(sql_req)
+        sql_res = cr.dictfetchone()
+        if sql_res:
+            if sql_res['total_amount'] is not None:
+                total_amount = sql_res['total_amount']
+            else:
+                total_amount = 0
+        else:
+            total_amount = 0                
         return total_amount
-    
+        
     _columns = {
         'trans_id': fields.char('Transaction ID',size=13, readonly=True),
         'customer_id': fields.many2one('rdm.customer','Customer',required=True),
@@ -1264,27 +1322,48 @@ class rdm_trans(osv.osv):
     def write(self, cr, uid, ids, values, context=None ):
         trans_id = ids[0]                
         trans = self._get_trans(cr, uid, trans_id, context)        
-        if trans['state'] == 'done':            
+        if trans.state == 'done':        
+            _logger.info('State : Done')    
             if values.get('bypass') == True:
+                _logger.info('Bypass Done State')
                 trans_data = {}
                 if values.get('method') == '_update_print_status':                                
                     trans_data.update({'printed':values.get('printed')})
-                    result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
+                    super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
                 if values.get('method') == 'trans_reset':                                
                     trans_data.update({'state':values.get('state')})
-                    result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)            
-                if values.get('method') == 'trans_req_delete' or values.get('method') == 'trans_del_approve' or values.get('method') == 'trans_del_reject':
+                    super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)                            
+                if values.get('method') == 'trans_req_delete':                                    
                     trans_data.update({'state':values.get('state')})
-                    result = super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)   
+                    super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)                    
+                    self.process_req_delete(cr, uid, ids, context)                                                
             else: 
                 raise osv.except_osv(('Warning'), ('Edit not allowed, Transaction already closed!'))            
-        else:
-            result = super(rdm_trans,self).write(cr, uid, ids, values, context=context)
-                        
-            #Calculate Total Amount
-            self._get_total_amount(cr, uid, ids, context)
-                        
-            return result        
+            
+        if trans.state == 'open':   
+            _logger.info('State : Open')                                 
+            if values.get('state') == 'done':
+                self.process_close(cr, uid, ids, context)
+                super(rdm_trans,self).write(cr, uid, ids, values, context=context)
+                #Calculate Total Amount
+                self._get_total_amount(cr, uid, ids, context)                        
+            else:
+                super(rdm_trans,self).write(cr, uid, ids, values, context=context)
+                #Calculate Total Amount
+                self._get_total_amount(cr, uid, ids, context)
+                                        
+        if trans.state == 'req_delete':
+            _logger.info('State : Request Delete')
+            trans_data = {}
+            trans_data.update({'state':values.get('state')})            
+            if values.get('method') == 'trans_del_reject':
+                super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
+                self.process_del_reject(cr, uid, ids, context)
+            if values.get('method') == 'trans_del_approve':
+                super(rdm_trans,self).write(cr, uid, ids, trans_data, context=context)
+                self.process_del_approve(cr, uid, ids, context)                
+                
+        return True        
 
     def unlink(self, cr, uid, ids, context=None):
         data = {}
@@ -1301,6 +1380,12 @@ class rdm_trans_detail(osv.osv):
         data = {}
         data.update({'state':'done'})
         self.write(cr, uid, ids, data, context=context)
+        
+    def trans_delete(self, cr, uid, ids, context=None):
+        data = {}
+        data.update({'state':'delete'})
+        self.write(cr, uid, ids, data, context=context)
+        
         
     def onchange_bank_id(self, cr, uid, ids, bank_id, context=None):
         _logger.info('Start Onchange Bank ID')

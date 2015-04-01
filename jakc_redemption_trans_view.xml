@@ -47,7 +47,7 @@
 	                                <tree colors="red:tenant_filter==True;">
 	                                    <field name="trans_date"/>
 	                                    <field name="tenant_id"/>
-	                                    <field name="total_amount"/>
+	                                    <field name="total_amount" widget="monetary"/>
 	                                    <field name="total_item"/>
 	                                    <field name="payment_type"/>
 	                                    <field name="bank_id"/>

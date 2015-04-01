@@ -1,6 +1,5 @@
 <openerp>
     <data>        
-        <menuitem id="rdm_promo_trans_menu" name="Transaction" parent="base.rdm_promo_menu" groups="base.group_rdm_operator" action="action_rdm_promo_trans" sequence="3"/>             
-		<menuitem id="rdm_point_trans_menu" name="Transaction" parent="base.rdm_point_menu" groups="base.group_rdm_operator" action="action_rdm_point_trans" sequence="2"/>        	
+        <menuitem id="rdm_promo_trans_menu" name="Transaction" parent="base.rdm_promo_menu" groups="base.group_rdm_operator" action="action_rdm_promo_trans" sequence="3"/>                     	
     </data>
 </openerp>
