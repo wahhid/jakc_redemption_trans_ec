@@ -1,0 +1,5 @@
+<openerp>
+    <data>
+        <menuitem id="rdm_trans_config" name="Transaction Settings" parent="base.menu_config" sequence="17" action="action_rdm_trans_config"/>
+    </data>
+</openerp>

@@ -518,12 +518,15 @@ class rdm_trans(osv.osv):
             max_spend_amount = schemas_id.max_spend_amount
             coupon_spend_amount = schemas_id.coupon_spend_amount
             point_spend_amount = schemas_id.point_spend_amount
+            trans_detail_list = {}
+            
             
                                 
             for trans_detail_id in trans_detail_ids:       
                 _logger.info('-- Calculate for Trans Detail id ' + str(trans_detail_id.id) +' --')
                 ##current_day_spend_amount = self.transactions_total_amount(cr, uid, [trans.id], context)
-                current_day_spend_amount = self.transactions_total_amount(cr, uid, trans, schemas_id, customer_id, context)                                    
+                
+                current_day_spend_amount = self.transactions_total_amount(cr, uid, trans_detail_id, schemas_id, customer_id, context)                                                 
                 _logger.info('Current Day Spend Amount : ' +  str(current_day_spend_amount))                
                 tenant = trans_detail_id.tenant_id                
                 bank_id = trans_detail_id.bank_id
@@ -1048,6 +1051,7 @@ class rdm_trans(osv.osv):
                 
                 #Update Redemption Trans Detail Status For Already Calculated         
                 self.pool.get('rdm.trans.detail').trans_close(cr, uid, [trans_detail_id.id], context=context)           
+                _logger.info('Change Transaction Detail State to Done')
                 
         _logger.info('End Calculate Add Coupon and Point')
                     
@@ -1239,9 +1243,6 @@ class rdm_trans(osv.osv):
         email_obj.send_mail(cr, uid, template_ids[0], trans.id, True, context=context)
 
     def transactions_total_amount(self, cr, uid, trans_id, schemas_id, customer_id, context=None):
-        #trans_id = ids[0]
-        #trans = self._get_trans(cr, uid, trans_id, context)
-        #customer_id = trans.customer_id        
         
         today = datetime.datetime.now()
         sql_req = '''SELECT 
