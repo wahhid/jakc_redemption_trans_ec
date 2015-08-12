@@ -65,9 +65,9 @@
 	                                	<field name="total_coupon"/>	                                	
 	                                	<field name="total_point"/>	                                	
 	                                	<field name="state"/>                                                                                                                                                                                                                                      
-	                            	</tree>                    
+	                            	</tree>                    	                            	
 	                        	</field>
-	                        </page>
+	                        </page>	                        
 							<page string="Transaction Coupons">
 	                        	<field name="customer_coupon_ids" widget="one2many_list" nolabel="1" readonly="1">
 	                            	<tree string="Coupons">                                                                                                	
@@ -112,7 +112,8 @@
                     <field name="customer_id"/>                        
                     <field name="trans_date"/>                    
                     <field name="total_amount"/>                     
-                    <field name="total_item"/>                    
+                    <field name="total_item"/>                            
+                    <field name="create_uid"/>                              
  					<field name="state"/>                   
                 </tree>
             </field>
@@ -141,7 +142,8 @@
 	                       		<tree string="Coupons">                                                                                                	
 	                                <field name="trans_schemas_id">
 	                                	<field name="name_related"/>
-	                                </field>	                                
+	                                </field>
+	                                <field name="valid_coupon"/>	                                
 	                                <field name="coupon"/>
 	                                <field name="basic"/>
 	                                <field name="multiple_ditotal"/>
@@ -157,6 +159,7 @@
 	                                <field name="trans_schemas_id">
 	                                	<field name="name_related"/>
 	                                </field>
+	                                <field name="valid_point"/>
 	                                <field name="point"/>
 	                                <field name="basic"/>
 	                                <field name="multiple_ditotal"/>
@@ -183,7 +186,39 @@
                         <field name="total_point"/>
                         <field name="remark"/>
                         <field name="state"/>
-                    </group>                 
+                    </group>
+                    <notebook>                    	
+                    	<page string="Transaction Coupons">
+	                    	<field name="trans_detail_coupon_ids" widget="one2many_list" nolabel="1" readonly="1">
+	                       		<tree string="Coupons">                                                                                                		                                
+	                                <field name="valid_coupon"/>
+	                                <field name="coupon"/>	                               
+	                                <field name="priority"/>
+	                                <field name="basic"/>	                                
+	                                <field name="multiple_ditotal"/>
+	                                <field name="multiple_terbesar"/>
+	                                <field name="add_ditotal"/>	                                
+	                                <field name="add_terbesar"/>
+	                                <field name="state"/>
+	                            </tree>                    
+	                        </field>       
+                    	</page>
+                    	<page string="Transaction Points">
+							<field name="trans_detail_point_ids" widget="one2many_list" nolabel="1" readonly="1">
+	                       		<tree string="Points">                                                                                                	
+	                                <field name="valid_point"/>
+	                                <field name="point"/>	                                	  
+	                                <field name="priority"/>                              
+	                                <field name="basic"/>
+	                                <field name="multiple_ditotal"/>
+	                                <field name="multiple_terbesar"/>
+	                                <field name="add_ditotal"/>
+	                                <field name="add_terbesar"/>
+	                                <field name="state"/>	                               
+	                            </tree>                    
+	                        </field>                                        	
+                    	</page>
+                    </notebook>                 
               	</form>
             </field>
         </record>       
