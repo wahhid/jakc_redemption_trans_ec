@@ -2,7 +2,6 @@ from openerp.osv import fields, osv
 import datetime
 from decimal import *
 import logging
-from openerp.netsvc import _logger_init
 _logger = logging.getLogger(__name__)
 
 AVAILABLE_STATES = [
@@ -464,11 +463,10 @@ class rdm_trans(osv.osv):
     def _get_total_amount(self, cr, uid, ids, context=None):
         _logger.info('Start Get Total Filter')
         trans_id = ids[0]        
-        trans = self._get_trans(cr, uid, trans_id, context)
-        
+        trans = self._get_trans(cr, uid, trans_id, context)                    
         total_amount = 0
         total_item = 0        
-        for trans_detail in trans.trans_detail_ids:
+        for trans_detail in trans.trans_detail_ids:            
             total_amount = total_amount + trans_detail.total_amount
             total_item = total_item + trans_detail.total_item
 
@@ -476,6 +474,7 @@ class rdm_trans(osv.osv):
         trans_data.update({'total_amount':total_amount})
         trans_data.update({'total_item':total_item})
         super(rdm_trans,self).write(cr, uid, [trans_id], trans_data, context=context)
+        
         _logger.info('End Get Total Filter')
 
     def _get_valid_total(self, cr, uid, ids, trans_schemas_id, context=None):
@@ -641,7 +640,30 @@ class rdm_trans(osv.osv):
                                         status = status or False
                                     if rules_detail_operation == 'and':
                                         status = status and False
-                                                                    
+                            
+                            #Zone 
+                            if rule_schema == 'zone':
+                                _logger.info('Start Zone Schemas')
+                                rule_zone_ids = rules_detail_id.zone_ids
+                                zone_list = {}   
+                                for rule_zone in rule_zone_ids:
+                                    _logger.info('Filled Zone List')
+                                    rule_zone_id  = rule_zone.zone_id.id
+                                    rule_zone_name = rule_zone.zone_id.name
+                                    zone_list.update({rule_zone_id:rule_zone_name})
+                        
+                                if customer_id.zone.id in zone_list.keys():
+                                    _logger.info('Match Zone : ' + customer_id.zone.name)
+                                    if rules_detail_operation == 'or':
+                                        status = status or True
+                                    if rules_detail_operation == 'and':
+                                        status = status and True                                                        
+                                else: 
+                                    if rules_detail_operation == 'or':
+                                        status = status or False
+                                    if rules_detail_operation == 'and':
+                                        status = status and False
+                                                                               
                             #Day Schemas
                             if rule_schema == 'day':
                                 _logger.info('Start Day Schemas')                
@@ -699,9 +721,9 @@ class rdm_trans(osv.osv):
                                 card_type_rules = False
                                 _logger.info('Start Card Type Schemas')
                                 customer_card_type = customer_id.card_type
-                                card_type_ids = rules.card_type_ids
+                                card_type_ids = rules_detail_id.card_type_ids
                                 for card_type in card_type_ids:
-                                    if customer_card_type.id == card_type.id:
+                                    if customer_card_type.id == card_type.card_type_id.id:
                                         card_type_rules = True
                                         
                                 if card_type_rules == True:
@@ -1062,7 +1084,558 @@ class rdm_trans(osv.osv):
                 _logger.info('Change Transaction Detail State to Done')
                                 
         _logger.info('End Calculate Add Coupon and Point')
+        
+    def _calculate_global_add_coupon_and_point(self, cr, uid, trans_id, context=None):
+        _logger.info('Start Global Add Calculate Add Coupon and Point')
+        trans = self._get_trans(cr, uid, trans_id, context)
+        trans_schemas_ids = trans.trans_schemas_ids
+        trans_detail_ids = trans.trans_detail_ids
+        customer_id  = trans.customer_id      
+        
+        total_amount_global = 0          
+        for trans_schemas_id in trans_schemas_ids:
+            schemas_id = trans_schemas_id.schemas_id               
+            schemas_rules_ids = schemas_id.rules_ids            
+            for schemas_rules_id  in schemas_rules_ids:             
+                rules = schemas_rules_id.rules_id
+                _logger.info("Check Rule : " + rules.name)
+                calculation = schemas_rules_id.schemas
+                _logger.info('Calculation : ' + str(calculation))                                      
+                apply_for = rules.apply_for
+                _logger.info('Apply For : ' + apply_for)                                        
+                operation = rules.operation
+                _logger.info('Operation : ' + operation)
+                quantity = rules.quantity
+                _logger.info('Quantity : ' + str(quantity))
+                trans_detail_global_ids = []                
+                if schemas_rules_id.is_global:                    
+                    for trans_detail_id in trans_detail_ids:                                                    
+                        _logger.info('-- Calculate for Trans Detail id ' + str(trans_detail_id.id) +' --')
+                        ##current_day_spend_amount = self.transactions_total_amount(cr, uid, [trans.id], context)                
+                        current_day_spend_amount = self.transactions_total_amount(cr, uid, trans_detail_id, schemas_id, customer_id, context)                                                 
+                        _logger.info('Current Day Spend Amount : ' +  str(current_day_spend_amount))                
+                        tenant = trans_detail_id.tenant_id                
+                        bank_id = trans_detail_id.bank_id
+                        bank_card_id = trans_detail_id.bank_card_id                
+                        payment_type = trans_detail_id.payment_type                
+                                                    
+                        schemas_status, message = self._get_tenant_filters(cr, uid, schemas_id, tenant, context=context)
+                        
+                        if schemas_status:                    
+                            #for schemas_rules_id in schemas_rules_ids:                                                                                                                                                                                    
+                            rules_detail_ids = rules.rules_detail_ids
+                            status = True                   
+                            for rules_detail_id in rules_detail_ids:
+                                rule_schema = rules_detail_id.rule_schema
+                                rules_detail_operation = rules_detail_id.operation
+                                    
+                                #Get Rules Status and Return True if valid rules     
+                                #Birthday
+                                if rule_schema == 'birthday':
+                                    _logger.info('Start Birthday Schemas')
+                                    today = datetime.date.today().strftime("%Y-%m-%d")
+                                    today_day = datetime.date.today().day
+                                    today_month = datetime.date.today().month  
+                                    _logger.info('Today : ' + today)
+                                        
+                                    birthdate = datetime.datetime.strptime(customer_id.birth_date,'%Y-%m-%d')                                                    
+                                    birthdate_day = birthdate.day
+                                    birthdate_month = birthdate.month                                    
+                                    _logger.info('Birth Date : ' + customer_id.birth_date)
+                                        
+                                    if today_day == birthdate_day and today_month == birthdate_month :
+                                        _logger.info('Rules Birthday Match')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False    
+                                                                            
+                                #Gender 
+                                if rule_schema == 'gender':
+                                    _logger.info('Start Gender Schemas')
+                                    rule_gender_ids = rules_detail_id.gender_ids
+                                    gender_list = {}   
+                                    for rule_gender in rule_gender_ids:
+                                        _logger.info('Filled Gender List')
+                                        rule_gender_id  = rule_gender.gender_id.id
+                                        rule_gender_name = rule_gender.gender_id.name
+                                        gender_list.update({rule_gender_id:rule_gender_name})
+                                
+                                    if customer_id.gender.id in gender_list.keys():
+                                        _logger.info('Match Gender : ' + customer_id.gender.name)
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False
+                                #Zone 
+                                if rule_schema == 'zone':
+                                    _logger.info('Start Zone Schemas')
+                                    rule_zone_ids = rules_detail_id.zone_ids
+                                    zone_list = {}   
+                                    for rule_zone in rule_zone_ids:
+                                        _logger.info('Filled Zone List')
+                                        rule_zone_id  = rule_zone.zone_id.id
+                                        rule_zone_name = rule_zone.zone_id.name
+                                        zone_list.update({rule_zone_id:rule_zone_name})
+                            
+                                    if customer_id.zone.id in zone_list.keys():
+                                        _logger.info('Match Zone : ' + customer_id.zone.name)
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False
+                                                                                    
+                                #Day Schemas
+                                if rule_schema == 'day':
+                                    _logger.info('Start Day Schemas')                
+                                    today = datetime.date.today().strftime("%Y-%m-%d")
+                                    day = rules_detail_id.day
+                                    if today == day :
+                                        _logger.info('Match Day : ' + today)
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False
+                                                
+            
+                                #Day Name Schemas
+                                if rule_schema == 'dayname':
+                                    _logger.info('Start Day Name Schemas')                        
+                                    weekday = datetime.datetime.today().weekday()                        
+                                    dayname = rules_detail_id.day_name
+                                    if weekday == 0:
+                                        day = '01'
+                                    if weekday == 1:
+                                        day = '02'
+                                    if weekday == 2:
+                                        day = '03'
+                                    if weekday == 3:
+                                        day = '04'
+                                    if weekday == 4:
+                                        day = '05'
+                                    if weekday == 5:
+                                        day = '06'
+                                    if weekday == 6:
+                                        day = '07'
+                                                   
+                                    if dayname == day:
+                                        _logger.info('Match Day Name : ' + day)
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False
+                                            
+                                    _logger.info('End Day Name Schemas')     
+                                                                                                                                                                          
+                                #Card Type
+                                if rule_schema == 'cardtype':
+                                    card_type_rules = False
+                                    _logger.info('Start Card Type Schemas')
+                                    customer_card_type = customer_id.card_type
+                                    card_type_ids = rules_detail_id.card_type_ids
+                                    for card_type in card_type_ids:
+                                        if customer_card_type.id == card_type.card_type_id.id:
+                                            card_type_rules = True
+                                            
+                                    if card_type_rules == True:
+                                        _logger.info('Match Card Type')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False
+                                    
+                                #Age
+                                if rule_schema == 'age':
+                                    _logger.info('Start Age Schemas')
+                                    customer_birthdate = datetime.datetime.strptime(customer_id.birth_date , '%Y-%m-%d')                        
+                                    customer_age_diff =  datetime.datetime.now() - customer_birthdate
+                                    customer_age = (customer_age_diff.days + customer_age_diff.seconds/86400)/365                                            
+                                    age_ids = rules_detail_id.age_ids
+                                    age_rules = False
+                                    for age_id in age_ids:
+                                        if age_id.operator == 'eq':
+                                            if customer_age == age_id.value1:
+                                                age_rules = True
+                                        if age_id.operator == 'ne':
+                                            if customer_age != age_id.value1:
+                                                age_rules = True                                    
+                                        if age_id.operator == 'lt':
+                                            if customer_age < age_id.value1:
+                                                age_rules = True
+                                        if age_id.operator == 'gt':
+                                            if customer_age > age_id.value1:
+                                                age_rules = True
+                                        if age_id.operator == 'bw':
+                                            if customer_age >= age_id.value1 and customer_age <= age_id.value2:
+                                                age_rules = True
+                                                                        
+                                    if age_rules == True:
+                                        _logger.info('Match Age')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False                                                        
+                                                                
+                                    _logger.info('End Age Schemas')
+                                                                        
+                                #Participant
+                                if rule_schema == 'participant':
+                                    participant_ids  = rules_detail_id.participant_ids
+                                    participant_list = {}
+                                    for participant_id in participant_ids:
+                                        participant = participant_id.participant_id
+                                        participant_list.update({participant:participant})
+                                    
+                                    participant_rules = False
+                                    if tenant.participant in participant_list.keys():
+                                        participant_rules = True
+                                                                    
+                                    if participant_rules == True:
+                                        _logger.info('Match Participant')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False                                                        
+                                        
+                                #Tenant Type     
+                                if rule_schema == 'tenanttype':
+                                    _logger.info('Start Tenant Type Schemas')   
+                                    total_amount = 0                                                
+                                    rules_tenant_category_ids = rules_detail_id.tenant_category_ids
+                                    
+                                    tenant_category_list = {}                            
+                                    for rules_tenant_category_id in rules_tenant_category_ids:
+                                        tenant_category = rules_tenant_category_id.tenant_category_id
+                                        tenant_category_list.update({tenant_category.id:tenant_category.name})
+                                                                        
+                                    tenanttype_rules = False                            
+                                    if tenant.category.id in tenant_category_list.keys():
+                                        tenanttype_rules = True                                           
+                                                                                                                
+                                    if tenanttype_rules:                        
+                                        _logger.info('Match Tenant Type')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False                                             
+                                    _logger.info('End Tenant Type Schemas')                            
+                                                                                                                
+                                #Tenant     
+                                if rule_schema == 'tenant':
+                                    _logger.info('Start Tenant Schemas')             
+                                    
+                                    total_amount = 0          
+                                    rules_tenant_ids = rules_detail_id.tenant_ids 
+                                    tenant_list = {}
+                                    for rules_tenant_id in rules_tenant_ids:
+                                        tenant_id = rules_tenant_id.tenant_id                            
+                                        tenant_list.update({tenant_id.id:tenant_id.name})                                       
+                                                                                                     
+                                    tenant_rules = False                                                                                                                        
+                                    if tenant.id in tenant_list.keys():
+                                        tenant_rules = True
+                                                                                                                                                        
+                                    if tenant_rules:                        
+                                        _logger.info('Match Tenant')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False     
+                                                                            
+                                    _logger.info('End Tenant Schemas')
+                                                               
+                                #Bank     
+                                if rule_schema == 'bank':
+                                    _logger.info('Start Bank Schemas')         
+                                    
+                                    rules_bank_ids = rules_detail_id.bank_ids
+                                    bank_card_list = {}
+                                    for rules_bank in rules_bank_ids:
+                                        bank  = rules_bank.bank_id
+                                        bank_card_list.update({bank.id:bank.name})
+                                                                            
+                                    bank_rules = False                                                
+                                    if payment_type == 'creditcard' or payment_type == 'debit':                                    
+                                            if bank_id.id in bank_card_list.keys():
+                                                bank_rules = True                                            
+                                                                                                                        
+                                    if bank_rules:                        
+                                        _logger.info('Match Bank')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False                                                                              
+                                
+                                #Bank Card     
+                                if rule_schema == 'bankcard':
+                                    _logger.info('Start Bank Card Schemas')    
+                                    total_amount = 0
+                                    rules_bank_card_ids = rules_detail_id.bank_card_ids
+                                    bank_card_list = {}
+                                    for rules_bank_card in rules_bank_card_ids:
+                                        bank_card_id = rules_bank_card.bank_card_id
+                                        bank_card_list.update({bank_card_id.id:bank_card_id.name})
+                                            
+                                    trans_detail_ids = trans.trans_detail_ids
+                                    bank_card_rules = True                                                
+                                    if payment_type == 'creditcard' or payment_type == 'debit':                                    
+                                        if bank_card_id.id in bank_card_list.keys():
+                                            bank_card_rules = False
+                                                
+                                    if bank_card_rules:                        
+                                        _logger.info('Match Bank Card')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False    
+                                    
+                                #Cash     
+                                if rule_schema == 'cash':
+                                    _logger.info('Start Cash Schemas')                                         
+                                    rules_cash_bank_ids = rules_detail_id.cash_ids
+                                    cash_bank_list = {}
+                                    for rules_cash_bank in rules_cash_bank_ids:
+                                        cash_bank  = rules_cash_bank.bank_id
+                                        cash_bank_list.update({cash_bank.id:cash_bank.name})
+                                                                            
+                                    cash_rules = True
+                                    if payment_type == 'creditcard' or payment_type == 'debit':
+                                        if bank_id.id in cash_bank_list.keys():
+                                            _logger.info('Card Detected')
+                                            cash_rules = False           
+                                        else:
+                                            _logger.info('Card Not Detected') 
+                                                                                                                        
+                                    if cash_rules:                        
+                                        _logger.info('Match Cash')
+                                        if rules_detail_operation == 'or':
+                                            status = status or True
+                                        if rules_detail_operation == 'and':
+                                            status = status and True                                                        
+                                    else: 
+                                        if rules_detail_operation == 'or':
+                                            status = status or False
+                                        if rules_detail_operation == 'and':
+                                            status = status and False        
+                                                                   
+                            if status == True:
+                                _logger.info('Status True - ADD Detail')                                                 
+                                trans_detail_global_ids.insert(len(trans_detail_global_ids), trans_detail_id.id)                                                            
+                            else:
+                                _logger.info('Status False')
+                                                                    
+                #End If Rules Global
+                                
+                if len(trans_detail_global_ids) > 1:
+                    trans_detail_globals = self.pool.get('rdm.trans.detail').browse(cr, uid, trans_detail_global_ids, context=context)                    
+                    for trans_detail_global in trans_detail_globals:
+                        total_amount_global = total_amount_global + trans_detail_global.total_amount                                                                
+                    _logger.info("Total Amount Global" + str(total_amount_global))
+                
+                    #Calculate Global Coupon or Point                
+                    rules_detail_ids = rules.rules_detail_ids
+                    rules_detail_spending = None
+                    for rules_detail_id in rules_detail_ids:
+                        if rules_detail_id.rule_schema == 'spending':
+                            rules_detail_spending = rules_detail_id
+                            break
                     
+                    spending_amount_rules = False                
+                    if rules_detail_spending:
+                        spending_amount_ids = rules_detail_spending.spending_amount_ids                                                            
+                        for spending_amount_id in spending_amount_ids:
+                            if spending_amount_id.operator == 'eq':
+                                if total_amount_global == spending_amount_id.value1:
+                                    spending_amount_rules = True
+                            if spending_amount_id.operator== 'lt':
+                                if total_amount_global < spending_amount_id.value1:
+                                    spending_amount_rules = True
+                            if spending_amount_id.operator == 'gt':
+                                if total_amount_global > spending_amount_id.value1:
+                                    spending_amount_rules = True
+                            if spending_amount_id.operator == 'bw':
+                                if total_amount_global >= spending_amount_id.value1 and trans_detail_id.total_amount <= spending_amount_id.value2:
+                                    spending_amount_rules = True
+                    
+                    max_spend_amount = schemas_id.max_spend_amount
+                    coupon_spend_amount = schemas_id.coupon_spend_amount
+                    schemas_id = trans_schemas_id.schemas_id               
+                    schemas_rules_ids = schemas_id.rules_ids                
+                    point_spend_amount = schemas_id.point_spend_amount
+                    current_spend_amount = self.transactions_total_amount(cr, uid, trans, schemas_id, customer_id, context)
+                    
+                    #Check Spend Amount
+                    spend_limit = True                       
+                    diff_spend_amount = max_spend_amount - current_spend_amount
+                    if diff_spend_amount < total_amount_global and diff_spend_amount > 0:
+                        total_amount_global = diff_spend_amount
+                        spend_limit = False                    
+                                                                                                                                         
+                    if spending_amount_rules and not spend_limit:
+                        coupon = 0
+                        point = 0
+                                                                    
+                        if coupon_spend_amount == 0:
+                            coupon = 0
+                        else:                    
+                            coupon = total_amount_global / coupon_spend_amount
+                        
+                        if point_spend_amount == 0:
+                            point = 0
+                        else:                    
+                            point = total_amount_global / point_spend_amount
+                        
+                        rules_add_ditotal_coupon = 0
+                        rules_add_terbesar_coupon = 0
+                        rules_add_ditotal_point = 0
+                        rules_add_terbesar_point = 0
+                        
+                        rules_multiple_ditotal_coupon = 1                
+                        rules_multiple_ditotal_point = 1
+                        rules_multiple_terbesar_coupon = 1                
+                        rules_multiple_terbesar_point = 1       
+                                     
+                        if operation == 'add':
+                            if calculation == 'ditotal':
+                                    if apply_for == '1':
+                                        rules_add_ditotal_coupon = rules_add_ditotal_coupon + Decimal(quantity)
+                                                                        
+                                    if apply_for == '2':
+                                        rules_add_ditotal_point = rules_add_ditotal_point + Decimal(quantity)                                                                    
+                                                                                                                  
+                            if calculation == 'terbesar':
+                                if apply_for == '1':                                
+                                    if rules_add_terbesar_coupon < Decimal(quantity):
+                                        rules_add_terbesar_coupon = Decimal(quantity)
+                                
+                                if  apply_for == '2':
+                                    if rules_add_terbesar_point < Decimal(quantity):
+                                        rules_add_terbesar_point = Decimal(quantity)
+                                      
+                        if operation == 'multiple':
+                            if calculation == 'ditotal':
+                                if apply_for == '1':                                                                     
+                                    rules_multiple_ditotal_coupon = rules_multiple_ditotal_coupon * Decimal(quantity)
+                                    
+                                if apply_for == '2':
+                                    rules_multiple_ditotal_point = rules_multiple_ditotal_point * Decimal(quantity)
+                                        
+                            if calculation == 'terbesar':
+                                if apply_for == '1':
+                                    if rules_multiple_terbesar_coupon < Decimal(quantity):
+                                        rules_multiple_terbesar_coupon = Decimal(quantity)
+                                
+                                if apply_for == '2':
+                                    if Decimal(quantity) == 0:
+                                        rules_multiple_terbesar_point = 0
+                                        
+                                    if rules_multiple_terbesar_point < Decimal(quantity):
+                                        rules_multiple_terbesar_point = Decimal(quantity)
+                        
+                        
+                        if coupon == None:
+                            coupon = 1
+                            result_coupon = (Decimal(coupon) * rules_multiple_ditotal_coupon * rules_multiple_terbesar_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
+                        else:
+                            result_coupon = (Decimal(coupon) * rules_multiple_ditotal_coupon * rules_multiple_terbesar_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
+                            
+                        if point == None:
+                            point = 1
+                            result_point = (Decimal(point) * rules_multiple_ditotal_point * rules_multiple_terbesar_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
+                        else:                    
+                            result_point = (Decimal(point) * rules_multiple_ditotal_point * rules_multiple_terbesar_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
+                        
+                        _logger.info('Total Coupon : ' + str(result_coupon))                                                               
+                        _logger.info('Total Point : ' + str(result_point))
+                        
+                        
+                        trans_detail_coupon_data = {}
+                        trans_detail_coupon_data.update({'trans_id': trans.id})                    
+                        trans_detail_coupon_data.update({'trans_schemas_id': trans_schemas_id.id})
+                        trans_detail_coupon_data.update({'basic': coupon})
+                        trans_detail_coupon_data.update({'coupon': result_coupon})
+                        trans_detail_coupon_data.update({'multiple_ditotal': rules_multiple_ditotal_coupon})
+                        trans_detail_coupon_data.update({'multiple_terbesar': rules_multiple_terbesar_coupon})                
+                        trans_detail_coupon_data.update({'add_ditotal': rules_add_ditotal_coupon})
+                        trans_detail_coupon_data.update({'add_terbesar': rules_add_terbesar_coupon})                                            
+                        self.pool.get('rdm.trans.detail.coupon').create(cr, uid, trans_detail_coupon_data, context=context)                    
+                        
+                                
+                        trans_detail_point_data = {}
+                        trans_detail_point_data.update({'trans_id': trans.id})                    
+                        trans_detail_point_data.update({'trans_schemas_id': trans_schemas_id.id})
+                        trans_detail_point_data.update({'basic': point})
+                        trans_detail_point_data.update({'point': result_point})
+                        trans_detail_point_data.update({'multiple_ditotal': rules_multiple_ditotal_point})
+                        trans_detail_point_data.update({'multiple_terbesar': rules_multiple_terbesar_point})
+                        trans_detail_point_data.update({'add_ditotal': rules_add_ditotal_point})
+                        trans_detail_point_data.update({'add_terbesar': rules_add_terbesar_point})                                          
+                        self.pool.get('rdm.trans.detail.point').create(cr, uid, trans_detail_point_data, context=context)
+                    #End Calculate Global Coupon or Point                  
+                
+        #End Loop trans_schemas_ids        
+        _logger.info('End Global Add Calculate Add Coupon and Point')
+                        
     def _calculate_trans_priority_per_schemas(self, cr , uid, trans_id, context=None):
         _logger.info('Start Calculate Valid Trans Per Schemas')
         trans = self._get_trans(cr, uid, trans_id, context)            
@@ -1142,7 +1715,7 @@ class rdm_trans(osv.osv):
                 self.pool.get('rdm.trans.detail.point').write(cr, uid, [trans_detail_point_id], trans_data, context=context)
                                                                                                                 
         _logger.info('End Calculate Valid Trans Per Schemas')
-    
+
     
     def _calculate_valid_coupon_and_point(self, cr , uid, trans_id, context=None):
         _logger.info('Start Calculate Valid Coupon and Point')
@@ -1165,87 +1738,95 @@ class rdm_trans(osv.osv):
             
             for trans_detail_coupon in trans_detail_coupons:                
                 trans_detail_id = trans_detail_coupon.trans_detail_id
-                
-                rules_multiple_ditotal_coupon = trans_detail_coupon.multiple_ditotal
-                rules_multiple_terbesar_coupon = trans_detail_coupon.multiple_terbesar
-                rules_add_ditotal_coupon = trans_detail_coupon.add_ditotal
-                rules_add_terbesar_coupon = trans_detail_coupon.add_terbesar
-                
-                if max_spend_amount == -1:
-                    _logger.info('Unlimited Spend Amount')
-                    diff_spend_amount = trans_detail_id.total_amount
+                if trans_detail_id:
+                    rules_multiple_ditotal_coupon = trans_detail_coupon.multiple_ditotal
+                    rules_multiple_terbesar_coupon = trans_detail_coupon.multiple_terbesar
+                    rules_add_ditotal_coupon = trans_detail_coupon.add_ditotal
+                    rules_add_terbesar_coupon = trans_detail_coupon.add_terbesar
+                    
+                    if max_spend_amount == -1:
+                        _logger.info('Unlimited Spend Amount')
+                        diff_spend_amount = trans_detail_id.total_amount
+                    else:
+                        _logger.info('Limited Spend Amount')    
+                        diff_spend_amount  = max_spend_amount - current_day_spend_amount            
+                    _logger.info('Diff Spend Amount : ' + str(diff_spend_amount))
+                    
+                    if diff_spend_amount <= 0:
+                        total_amount = 0          
+                    else:                         
+                        if diff_spend_amount >= trans_detail_id.total_amount:
+                            total_amount = trans_detail_id.total_amount                        
+                            current_day_spend_amount = current_day_spend_amount + total_amount
+                            trans_data = {}
+                            valid_coupon = trans_detail_coupon.coupon 
+                            trans_data.update({'valid_coupon': valid_coupon})
+                            self.pool.get('rdm.trans.detail.coupon').write(cr, uid, [trans_detail_coupon.id], trans_data, context=context)
+                                                    
+                        else:                                                                                    
+                            total_amount = diff_spend_amount                        
+                            #Check Allow Generate Coupon       
+                            if coupon_spend_amount != 0:      
+                                valid_basic_coupon = total_amount / coupon_spend_amount
+                                valid_coupon =  (valid_basic_coupon * rules_multiple_ditotal_coupon * rules_multiple_terbesar_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
+                            else:
+                                valid_coupon = 0                            
+                            trans_data = {}                        
+                            trans_data.update({'valid_coupon': valid_coupon})
+                            self.pool.get('rdm.trans.detail.coupon').write(cr, uid, [trans_detail_coupon.id], trans_data, context=context)
                 else:
-                    _logger.info('Limited Spend Amount')    
-                    diff_spend_amount  = max_spend_amount - current_day_spend_amount            
-                _logger.info('Diff Spend Amount : ' + str(diff_spend_amount))
-                
-                if diff_spend_amount <= 0:
-                    total_amount = 0          
-                else:                         
-                    if diff_spend_amount >= trans_detail_id.total_amount:
-                        total_amount = trans_detail_id.total_amount                        
-                        current_day_spend_amount = current_day_spend_amount + total_amount
-                        trans_data = {}
-                        valid_coupon = trans_detail_coupon.coupon 
-                        trans_data.update({'valid_coupon': valid_coupon})
-                        self.pool.get('rdm.trans.detail.coupon').write(cr, uid, [trans_detail_coupon.id], trans_data, context=context)
-                                                
-                    else:                                                                                    
-                        total_amount = diff_spend_amount                        
-                        #Check Allow Generate Coupon       
-                        if coupon_spend_amount != 0:      
-                            valid_basic_coupon = total_amount / coupon_spend_amount
-                            valid_coupon =  (valid_basic_coupon * rules_multiple_ditotal_coupon * rules_multiple_terbesar_coupon) + (rules_add_ditotal_coupon + rules_add_terbesar_coupon)
-                        else:
-                            valid_coupon = 0                            
-                        trans_data = {}                        
-                        trans_data.update({'valid_coupon': valid_coupon})
-                        self.pool.get('rdm.trans.detail.coupon').write(cr, uid, [trans_detail_coupon.id], trans_data, context=context)
-                
-            current_day_spend_amount = self.current_total_amount(cr, uid, customer_id, context)    
+                    trans_data = {}   
+                    valid_coupon = trans_detail_coupon.coupon                      
+                    trans_data.update({'valid_coupon': valid_coupon})
+                    self.pool.get('rdm.trans.detail.coupon').write(cr, uid, [trans_detail_coupon.id], trans_data, context=context)
             
+            current_day_spend_amount = self.current_total_amount(cr, uid, customer_id, context)            
             trans_detail_point_ids = self.pool.get('rdm.trans.detail.point').search(cr, uid, args, order="priority asc",context=context)
             trans_detail_points = self.pool.get('rdm.trans.detail.point').browse(cr, uid, trans_detail_point_ids, context=context)
             
             for trans_detail_point in trans_detail_points:                
                 trans_detail_id = trans_detail_point.trans_detail_id
-                
-                rules_multiple_ditotal_point = trans_detail_point.multiple_ditotal
-                rules_multiple_terbesar_point = trans_detail_point.multiple_terbesar
-                rules_add_ditotal_point = trans_detail_point.add_ditotal
-                rules_add_terbesar_point = trans_detail_point.add_terbesar
-                
-                if max_spend_amount == -1:
-                    _logger.info('Unlimited Spend Amount')
-                    diff_spend_amount = trans_detail_id.total_amount
+                if trans_detail_id:
+                    rules_multiple_ditotal_point = trans_detail_point.multiple_ditotal
+                    rules_multiple_terbesar_point = trans_detail_point.multiple_terbesar
+                    rules_add_ditotal_point = trans_detail_point.add_ditotal
+                    rules_add_terbesar_point = trans_detail_point.add_terbesar
+                    
+                    if max_spend_amount == -1:
+                        _logger.info('Unlimited Spend Amount')
+                        diff_spend_amount = trans_detail_id.total_amount
+                    else:
+                        _logger.info('Limited Spend Amount')    
+                        diff_spend_amount  = max_spend_amount - current_day_spend_amount            
+                    _logger.info('Diff Spend Amount : ' + str(diff_spend_amount))
+                    
+                    if diff_spend_amount <= 0:
+                        total_amount = 0          
+                    else:                         
+                        if diff_spend_amount >= trans_detail_id.total_amount:
+                            total_amount = trans_detail_id.total_amount                        
+                            current_day_spend_amount = current_day_spend_amount + total_amount
+                            trans_data = {}
+                            valid_point = trans_detail_point.point 
+                            trans_data.update({'valid_point': valid_point})
+                            self.pool.get('rdm.trans.detail.point').write(cr, uid, [trans_detail_point.id], trans_data, context=context)
+                                                    
+                        else:                                                                                    
+                            total_amount = diff_spend_amount
+                            #Check Allow Generate Point
+                            if point_spend_amount != 0:                                                            
+                                valid_basic_point = total_amount / point_spend_amount
+                                valid_point =  (valid_basic_point * rules_multiple_ditotal_point * rules_multiple_terbesar_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
+                            else: 
+                                valid_point = 0
+                            trans_data = {}                        
+                            trans_data.update({'valid_point': valid_point})
+                            self.pool.get('rdm.trans.detail.point').write(cr, uid, [trans_detail_point.id], trans_data, context=context)
                 else:
-                    _logger.info('Limited Spend Amount')    
-                    diff_spend_amount  = max_spend_amount - current_day_spend_amount            
-                _logger.info('Diff Spend Amount : ' + str(diff_spend_amount))
-                
-                if diff_spend_amount <= 0:
-                    total_amount = 0          
-                else:                         
-                    if diff_spend_amount >= trans_detail_id.total_amount:
-                        total_amount = trans_detail_id.total_amount                        
-                        current_day_spend_amount = current_day_spend_amount + total_amount
-                        trans_data = {}
-                        valid_point = trans_detail_point.point 
-                        trans_data.update({'valid_point': valid_point})
-                        self.pool.get('rdm.trans.detail.point').write(cr, uid, [trans_detail_point.id], trans_data, context=context)
-                                                
-                    else:                                                                                    
-                        total_amount = diff_spend_amount
-                        #Check Allow Generate Point
-                        if point_spend_amount != 0:                                                            
-                            valid_basic_point = total_amount / point_spend_amount
-                            valid_point =  (valid_basic_point * rules_multiple_ditotal_point * rules_multiple_terbesar_point) + (rules_add_ditotal_point + rules_add_terbesar_point)
-                        else: 
-                            valid_point = 0
-                        trans_data = {}                        
-                        trans_data.update({'valid_point': valid_point})
-                        self.pool.get('rdm.trans.detail.point').write(cr, uid, [trans_detail_point.id], trans_data, context=context)
-                                                                                                                                            
+                    valid_point = trans_detail_point.point 
+                    trans_data.update({'valid_point': valid_point})
+                    self.pool.get('rdm.trans.detail.point').write(cr, uid, [trans_detail_point.id], trans_data, context=context)
+                                                                                                                  
         _logger.info('End Calculate Valid Coupon and Point') 
     
     def _close_trans_detail(self, cr, uid, trans_id, context=None):
@@ -1392,7 +1973,8 @@ class rdm_trans(osv.osv):
             trans_schemas_id = self.pool.get('rdm.trans.schemas').create(cr, uid, trans_schemas_data, context=context)            
             self._get_customer_filters(cr, uid, ids, trans_schemas_id, context)
             self._get_valid_total(cr, uid, ids, trans_schemas_id, context)            
-        
+    
+    
     def _pre_calculation(self, cr, uid, ids, context=None):
         trans_id = ids[0]
         #Calculate Total Amount
@@ -1404,7 +1986,9 @@ class rdm_trans(osv.osv):
     def _post_calculation(self, cr, uid, ids, context=None):
         trans_id = ids[0]
         #Calculate Additional Coupon and Point for All Transaction Detail
-        self._calculate_add_coupon_and_point(cr, uid, trans_id, context=context)
+        self._calculate_add_coupon_and_point(cr, uid, trans_id, context=context)        
+        #Calculate Global Additional Coupon and Point for All Transaction Detail
+        self._calculate_global_add_coupon_and_point(cr, uid, trans_id, context=context)        
         #Calculate Priority for Coupon and Point
         self._calculate_trans_priority_per_schemas(cr, uid, trans_id, context)
         #Calculate Valid Coupon and Point
@@ -1412,7 +1996,7 @@ class rdm_trans(osv.osv):
         #Close Trans Detail
         self._close_trans_detail(cr, uid, trans_id, context)
         #Calculate Schemas Total Coupon and Point          
-        self._calculate_schemas_total_coupon_and_point(cr, uid, trans_id, context=context)        
+        self._calculate_schemas_total_coupon_and_point(cr, uid, trans_id, context=context)            
         #Calculate Total Coupon and Point for All Schemas                                
         self._calculate_total_coupon_and_point(cr, uid, trans_id, context)
         #Generate Coupon
@@ -1466,8 +2050,7 @@ class rdm_trans(osv.osv):
             total_amount = 0                
         return total_amount
         
-    def transactions_total_amount(self, cr, uid, trans_id, schemas_id, customer_id, context=None):
-        
+    def transactions_total_amount(self, cr, uid, trans_id, schemas_id, customer_id, context=None):        
         today = datetime.datetime.now()
         sql_req = '''SELECT 
                     sum(rdm_trans_detail.total_amount) as total_amount
@@ -1499,7 +2082,26 @@ class rdm_trans(osv.osv):
         else:
             total_amount = 0                
         return total_amount
+    
+    def calculate_global_rules(self, cr, uid, ids, context=None):
+        trans_id = ids[0]
+        trans = self._get_trans(cr, uid, trans_id, context)
+        trans_schemas_ids = self.trans.trans_schemas_ids   
+        for trans_schemas_id in trans_schemas_ids:
+            schemas_id = trans_schemas_id.schemas_id
+            for schemas_rules_id in schemas_id.rules_ids:
+                rules_id = schemas_rules_id.rules_id
+                schemas = schemas_rules_id.schemas
+                
+                
+                
+                
+            #if trans.total_amount > trans.min_spend_amount:
+            #    if schemas_id.min_point > -1:                    
+            #        if trans.total_point > schemas_id.min_point:
+            #            point_to_adjust =      
         
+            
     _columns = {
         'trans_id': fields.char('Transaction ID',size=13, readonly=True),
         'customer_id': fields.many2one('rdm.customer','Customer',required=True),
@@ -1634,7 +2236,7 @@ class rdm_trans_detail(osv.osv):
         'payment_type': fields.selection([('cash','Cash'),('creditcard','Credit Card'),('debit','Debit')],'Payment Type',required=True),
         'bank_id': fields.many2one('rdm.bank','Bank'),
         'bank_card_id': fields.many2one('rdm.bank.card','Bank Card'),                                
-        'card_number': fields.char('Card Number', size=20),        
+        'card_number': fields.char('Card Number', size=20),            
         'trans_detail_coupon_ids': fields.one2many('rdm.trans.detail.coupon','trans_detail_id','Coupons'),
         'trans_detail_point_ids': fields.one2many('rdm.trans.detail.point','trans_detail_id','Points'),                
         'state':  fields.selection(AVAILABLE_STATES, 'Status', size=16, readonly=True),
@@ -1716,8 +2318,7 @@ class rdm_trans_detail_point(osv.osv):
         'add_ditotal': fields.float('Add Ditotal'),
         'add_terbesar': fields.float('Add Terbesar'),     
         'state': fields.selection(AVAILABLE_STATES,'Status',size=16,readonly=True),   
-    }    
-    
+    }        
     _defaults = {
         'state': lambda *a: 'open',
     }
@@ -1735,6 +2336,17 @@ class rdm_trans_detail_reward(osv.osv):
         'quantity': fields.integer('Quantity'),
     }    
 rdm_trans_detail_reward()
+
+class rdm_trans_detail_below_min_spend_amount(osv.osv):
+    _name = "rdm.trans.detail.below.min.spend.amount"
+    _description = "Redemption Transaction Detail Below Min Spend Amount"
+    _columns = {
+        'trans_id': fields.many2one('rdm.trans', 'Transaction'),        
+        'trans_detail_id': fields.many2one('rdm.trans.detail','Transaction Detail'),
+        'trans_schemas_id': fields.many2one('rdm.trans.schemas','Transaction Schemas'),
+        'below_min_spend_amount': fields.boolean('bsma')                
+    }
+rdm_trans_detail_below_min_spend_amount()
 
 class rdm_trans_schemas(osv.osv):
     _name = "rdm.trans.schemas"
